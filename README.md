@@ -23,9 +23,11 @@ The project is intentionally built as an ML engineering system rather than a not
 
 ## Status
 
-**Current milestone: M0 — Repository foundation (complete).**
+**Current milestone: M1 — Dataset & exploration.**
 
-The repository foundation has been implemented and validated by GitHub Actions on Python 3.11, 3.12 and 3.13. Dataset selection and all ML functionality start in M1 and later milestones.
+M0 — repository foundation — is complete and validated by GitHub Actions on Python 3.11, 3.12 and 3.13.
+
+The primary dataset selected for M1 is **KolektorSDD2**, an industrial surface-defect dataset with defective/defect-free samples and pixel-level annotations suitable for the project progression from classification to segmentation.
 
 ## Planned workflow
 
@@ -77,7 +79,19 @@ Docker
 
 ## Local setup
 
-Python 3.11–3.13 is supported for the repository foundation.
+Python 3.11 is the default development environment. The foundation CI also validates Python 3.12 and 3.13.
+
+### Conda
+
+```bash
+conda env create -f environment.yml
+conda activate industrial-defect-vision
+pytest
+```
+
+`environment.yml` creates the Conda environment and installs the project from `pyproject.toml`, which remains the source of truth for Python dependencies.
+
+### venv / pip
 
 ```bash
 python -m venv .venv
@@ -102,6 +116,8 @@ Project documentation lives under `docs/`:
 - `docs/experiments/` — experiment summaries and conclusions;
 - `docs/learning/` — durable technical learning notes;
 - `docs/portfolio/` — project explanation and interview preparation.
+
+Dataset source, license, split policy and preparation notes live in `data/README.md`.
 
 ## Reproducibility
 
