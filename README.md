@@ -69,6 +69,9 @@ Docker
 
 ## Repository principles
 
+- Prefer simple, explicit and readable implementations.
+- Code should feel natural and idiomatic rather than artificially abstract or over-engineered.
+- Add abstractions only when they solve a demonstrated problem.
 - Reusable code belongs in `src/industrial_vision/`.
 - Executable entry points belong in `scripts/` and should call reusable code from `src/`.
 - Notebooks are for exploration, visualization and error analysis, not the only way to train or infer.
