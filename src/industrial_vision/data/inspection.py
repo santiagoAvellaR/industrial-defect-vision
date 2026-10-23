@@ -1,174 +1,100 @@
-"""Utilities for inspecting image datasets before model development."""
-
-from __future__ import annotations
-
-from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from PIL import Image
 
-IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}
-MASK_HINTS = {
-    "annotation",
-    "annotations",
-    "ground_truth",
-    "groundtruth",
-    "gt",
-    "label",
-    "labels",
-    "mask",
-    "masks",
-}
+
+def find_pairs(root: Path, split: str):
+    split_dir = Path(root) / split
+    if not split_dir.is_dir():
+        raise FileNotFoundError(f"Missing KSDD2 split: {split_dir}")
+
+    images = sorted(
+        path for path in split_dir.glob("*.png")
+        if not path.stem.endswith("_GT")
+    )
+    masks = {
+        path.stem.removesuffix("_GT"): path
+        for path in split_dir.glob("*_GT.png")
+    }
+
+    pairs = []
+    missing_masks = []
+
+    for image_path in images:
+        mask_path = masks.pop(image_path.stem, None)
+        if mask_path is None:
+            missing_masks.append(image_path.name)
+        else:
+            pairs.append((image_path, mask_path))
+
+    orphan_masks = sorted(path.name for path in masks.values())
+    return pairs, missing_masks, orphan_masks
 
 
-@dataclass(frozen=True)
-class DatasetInspection:
-    """Summary produced from a recursive scan of an image dataset."""
+def inspect_split(root: Path, split: str) -> dict:
+    pairs, missing_masks, orphan_masks = find_pairs(root, split)
 
-    root: Path
-    total_images: int
-    by_top_level: dict[str, int]
-    by_extension: dict[str, int]
-    by_size: dict[str, int]
-    by_mode: dict[str, int]
-    mask_candidates: int
-    non_empty_mask_candidates: int
-    unreadable_files: tuple[Path, ...]
-    samples_by_top_level: dict[str, tuple[Path, ...]]
+    defective = 0
+    size_mismatches = []
+
+    for image_path, mask_path in pairs:
+        with Image.open(image_path) as image, Image.open(mask_path) as mask:
+            if image.size != mask.size:
+                size_mismatches.append(image_path.name)
+            if mask.getbbox() is not None:
+                defective += 1
+
+    return {
+        "samples": len(pairs),
+        "defective": defective,
+        "clean": len(pairs) - defective,
+        "missing_masks": missing_masks,
+        "orphan_masks": orphan_masks,
+        "size_mismatches": size_mismatches,
+    }
 
 
-def discover_image_files(root: Path) -> list[Path]:
-    """Return supported image files below ``root`` in deterministic order."""
-
+def inspect_ksdd2(root: Path) -> dict[str, dict]:
     root = Path(root)
-    if not root.exists():
-        raise FileNotFoundError(f"Dataset directory does not exist: {root}")
-    if not root.is_dir():
-        raise NotADirectoryError(f"Dataset path is not a directory: {root}")
-
-    return sorted(
-        path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-    )
+    return {
+        "train": inspect_split(root, "train"),
+        "test": inspect_split(root, "test"),
+    }
 
 
-def _top_level_group(root: Path, path: Path) -> str:
-    relative = path.relative_to(root)
-    return relative.parts[0] if len(relative.parts) > 1 else "."
+def format_report(root: Path, report: dict[str, dict]) -> str:
+    lines = [f"KSDD2 root: {Path(root).resolve()}"]
 
+    for split in ("train", "test"):
+        stats = report[split]
+        lines.extend([
+            "",
+            f"{split}:",
+            f"  samples: {stats['samples']}",
+            f"  defective: {stats['defective']}",
+            f"  clean: {stats['clean']}",
+            f"  missing masks: {len(stats['missing_masks'])}",
+            f"  orphan masks: {len(stats['orphan_masks'])}",
+            f"  image/mask size mismatches: {len(stats['size_mismatches'])}",
+        ])
 
-def _looks_like_mask(root: Path, path: Path) -> bool:
-    relative = path.relative_to(root)
-    directory_parts = {part.lower() for part in relative.parts[:-1]}
-    stem_tokens = set(relative.stem.lower().replace("-", "_").split("_"))
-    return bool((directory_parts | stem_tokens) & MASK_HINTS)
+        for label, key in (
+            ("missing mask", "missing_masks"),
+            ("orphan mask", "orphan_masks"),
+            ("size mismatch", "size_mismatches"),
+        ):
+            for name in stats[key]:
+                lines.append(f"    {label}: {name}")
 
+    total_samples = sum(report[split]["samples"] for split in report)
+    total_defective = sum(report[split]["defective"] for split in report)
 
-def inspect_dataset(root: Path, *, samples_per_group: int = 3) -> DatasetInspection:
-    """Inspect dataset structure and lightweight image metadata.
-
-    The function intentionally makes no assumptions about dataset-specific
-    image/mask pairing. Mask statistics are only heuristic candidates based on
-    common directory or filename hints.
-    """
-
-    root = Path(root).resolve()
-    image_files = discover_image_files(root)
-
-    by_top_level: Counter[str] = Counter()
-    by_extension: Counter[str] = Counter()
-    by_size: Counter[str] = Counter()
-    by_mode: Counter[str] = Counter()
-    samples: defaultdict[str, list[Path]] = defaultdict(list)
-    unreadable: list[Path] = []
-    mask_candidates = 0
-    non_empty_mask_candidates = 0
-
-    for path in image_files:
-        group = _top_level_group(root, path)
-        by_top_level[group] += 1
-        by_extension[path.suffix.lower()] += 1
-        if len(samples[group]) < samples_per_group:
-            samples[group].append(path.relative_to(root))
-
-        is_mask_candidate = _looks_like_mask(root, path)
-        if is_mask_candidate:
-            mask_candidates += 1
-
-        try:
-            with Image.open(path) as image:
-                width, height = image.size
-                by_size[f"{width}x{height}"] += 1
-                by_mode[image.mode] += 1
-
-                if is_mask_candidate:
-                    extrema = image.convert("L").getextrema()
-                    if extrema is not None and extrema[1] > 0:
-                        non_empty_mask_candidates += 1
-        except (OSError, ValueError):
-            unreadable.append(path.relative_to(root))
-
-    return DatasetInspection(
-        root=root,
-        total_images=len(image_files),
-        by_top_level=dict(sorted(by_top_level.items())),
-        by_extension=dict(sorted(by_extension.items())),
-        by_size=dict(by_size.most_common()),
-        by_mode=dict(sorted(by_mode.items())),
-        mask_candidates=mask_candidates,
-        non_empty_mask_candidates=non_empty_mask_candidates,
-        unreadable_files=tuple(unreadable),
-        samples_by_top_level={
-            group: tuple(paths) for group, paths in sorted(samples.items())
-        },
-    )
-
-
-def _format_counts(title: str, values: dict[str, int]) -> Iterable[str]:
-    yield f"{title}:"
-    if not values:
-        yield "  (none)"
-        return
-    for key, value in values.items():
-        yield f"  {key}: {value}"
-
-
-def format_inspection(inspection: DatasetInspection) -> str:
-    """Format an inspection summary for terminal output."""
-
-    lines = [
-        f"Dataset root: {inspection.root}",
-        f"Image files: {inspection.total_images}",
+    lines.extend([
         "",
-    ]
-    lines.extend(_format_counts("Top-level groups", inspection.by_top_level))
-    lines.append("")
-    lines.extend(_format_counts("Extensions", inspection.by_extension))
-    lines.append("")
-    lines.extend(_format_counts("Image sizes", inspection.by_size))
-    lines.append("")
-    lines.extend(_format_counts("Image modes", inspection.by_mode))
-    lines.extend(
-        [
-            "",
-            f"Mask candidates (heuristic): {inspection.mask_candidates}",
-            "Non-empty mask candidates (heuristic): "
-            f"{inspection.non_empty_mask_candidates}",
-            f"Unreadable image files: {len(inspection.unreadable_files)}",
-            "",
-            "Sample paths:",
-        ]
-    )
-
-    for group, paths in inspection.samples_by_top_level.items():
-        lines.append(f"  {group}:")
-        lines.extend(f"    {path}" for path in paths)
-
-    if inspection.unreadable_files:
-        lines.extend(["", "Unreadable files:"])
-        lines.extend(f"  {path}" for path in inspection.unreadable_files)
+        "total:",
+        f"  samples: {total_samples}",
+        f"  defective: {total_defective}",
+        f"  clean: {total_samples - total_defective}",
+    ])
 
     return "\n".join(lines)

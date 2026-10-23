@@ -1,42 +1,45 @@
 from pathlib import Path
 
-import pytest
 from PIL import Image
 
-from industrial_vision.data.inspection import (
-    discover_image_files,
-    inspect_dataset,
-)
+from industrial_vision.data.inspection import find_pairs, inspect_split
 
 
-def _save_rgb(path: Path, size: tuple[int, int] = (10, 20)) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", size, color=(0, 0, 0)).save(path)
+def save_pair(root: Path, split: str, name: str, *, defective: bool = False) -> None:
+    split_dir = root / split
+    split_dir.mkdir(parents=True, exist_ok=True)
+
+    Image.new("RGB", (10, 20)).save(split_dir / f"{name}.png")
+
+    mask = Image.new("L", (10, 20))
+    if defective:
+        mask.putpixel((0, 0), 255)
+    mask.save(split_dir / f"{name}_GT.png")
 
 
-def _save_mask(path: Path, *, non_empty: bool) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("L", (10, 20), color=0)
-    if non_empty:
-        image.putpixel((0, 0), 255)
-    image.save(path)
+def test_inspect_split_counts_defective_and_clean_samples(tmp_path: Path) -> None:
+    save_pair(tmp_path, "train", "10000")
+    save_pair(tmp_path, "train", "10001", defective=True)
+
+    stats = inspect_split(tmp_path, "train")
+
+    assert stats["samples"] == 2
+    assert stats["defective"] == 1
+    assert stats["clean"] == 1
+    assert stats["missing_masks"] == []
+    assert stats["orphan_masks"] == []
+    assert stats["size_mismatches"] == []
 
 
-def test_inspect_dataset_summarizes_structure(tmp_path: Path) -> None:
-    _save_rgb(tmp_path / "train" / "sample.jpg")
-    _save_mask(tmp_path / "ground_truth" / "sample.png", non_empty=True)
+def test_find_pairs_reports_missing_and_orphan_masks(tmp_path: Path) -> None:
+    split_dir = tmp_path / "train"
+    split_dir.mkdir()
 
-    inspection = inspect_dataset(tmp_path)
+    Image.new("RGB", (10, 20)).save(split_dir / "10000.png")
+    Image.new("L", (10, 20)).save(split_dir / "99999_GT.png")
 
-    assert inspection.total_images == 2
-    assert inspection.by_top_level == {"ground_truth": 1, "train": 1}
-    assert inspection.by_extension == {".jpg": 1, ".png": 1}
-    assert inspection.by_size == {"10x20": 2}
-    assert inspection.mask_candidates == 1
-    assert inspection.non_empty_mask_candidates == 1
-    assert inspection.unreadable_files == ()
+    pairs, missing_masks, orphan_masks = find_pairs(tmp_path, "train")
 
-
-def test_discover_image_files_rejects_missing_directory(tmp_path: Path) -> None:
-    with pytest.raises(FileNotFoundError):
-        discover_image_files(tmp_path / "missing")
+    assert pairs == []
+    assert missing_masks == ["10000.png"]
+    assert orphan_masks == ["99999_GT.png"]

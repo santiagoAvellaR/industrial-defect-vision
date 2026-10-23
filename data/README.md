@@ -4,48 +4,60 @@ M1 uses **Kolektor Surface-Defect Dataset 2 (KolektorSDD2 / KSDD2)** as the prim
 
 ## Why this dataset
 
-KolektorSDD2 is a real industrial surface-inspection dataset captured in a controlled production environment. It contains both defective and defect-free samples and supports the progression used in this project: image-level defect classification first, then pixel-level defect localization/segmentation.
+KSDD2 is a real industrial surface-inspection dataset with defect-free and defective samples plus pixel-level masks. That lets this project use the same data for classification first and segmentation later.
 
-Dataset summary from the official ViCoS source:
-
-- 3,335 images total;
-- 356 images with visible defects;
-- 2,979 images without defects;
-- image size approximately 230 x 630 pixels;
-- official training set: 246 positive + 2,085 negative images;
-- official test set: 110 positive + 894 negative images;
-- defects include scratches, minor spots and other surface imperfections.
-
-## Source
+## Source and license
 
 Official dataset page:
 
 https://www.vicos.si/resources/kolektorsdd2/
 
-Download the dataset from the official source rather than redistributing it through this repository.
+KSDD2 is released under **CC BY-NC-SA 4.0**. The dataset is downloaded from the official source and is not committed to this repository.
 
-## License
+## Local layout
 
-KolektorSDD2 is released under **CC BY-NC-SA 4.0**. Commercial use requires permission from the dataset authors. The dataset itself is therefore not committed to this repository.
-
-## Planned local layout
+The downloaded archive uses this structure:
 
 ```text
-data/
-├── raw/          # original downloaded/extracted dataset; ignored by Git
-├── processed/    # generated representations if needed; ignored by Git
-└── splits/       # reproducible split manifests tracked by Git
+data/raw/ksdd2/
+├── train/
+│   ├── 10000.png
+│   ├── 10000_GT.png
+│   └── ...
+└── test/
+    ├── 20000.png
+    ├── 20000_GT.png
+    └── ...
 ```
 
-The exact layout inside `raw/` will be documented after inspecting the downloaded archive instead of assuming a structure in advance.
+Each sample image should have a mask with the same stem plus `_GT`.
+
+## Initial inspection
+
+The current local archive contains:
+
+- 6,672 PNG files;
+- 3,336 RGB images and 3,336 grayscale images;
+- 4,664 files under `train`;
+- 2,008 files under `test`;
+- 356 non-empty mask candidates;
+- no unreadable image files.
+
+This suggests 2,332 apparent training samples and 1,004 test samples. The official dataset summary reports 2,331 training samples and 1,004 test samples, so the local training set contains one extra or irregular sample that must be identified before the split is frozen.
+
+Run the project inspector with:
+
+```bash
+python scripts/inspect_dataset.py data/raw/ksdd2
+```
 
 ## Split policy
 
-The official test set will remain untouched for final evaluation.
+The official test set stays untouched for final evaluation.
 
-The official training set will be divided into train and validation subsets using a deterministic, fixed-seed split stratified by defect presence. Before freezing that split, M1 will inspect filenames, duplicates and any grouping information that could create leakage between related samples.
+After the extra training sample is understood, the official training set will be divided into train and validation subsets with a fixed seed and stratification by defect presence.
 
-Planned proportions inside the official training set:
+Target proportions inside the official training set:
 
 - train: 80%;
 - validation: 20%;
@@ -59,8 +71,8 @@ Before training any model we will verify:
 
 - image and mask pairing;
 - mask/image spatial alignment;
-- image sizes and channels;
 - positive/negative class balance;
+- image sizes and channels;
 - defect-area distribution;
 - exact and obvious near-duplicates;
 - reproducibility of the train/validation split;

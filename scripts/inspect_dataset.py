@@ -1,29 +1,16 @@
-"""CLI entry point for lightweight dataset inspection."""
-
-from __future__ import annotations
-
 import argparse
 from pathlib import Path
 
-from industrial_vision.data.inspection import format_inspection, inspect_dataset
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Inspect image dataset structure and basic metadata."
-    )
-    parser.add_argument(
-        "data_dir",
-        type=Path,
-        help="Root directory of the extracted dataset.",
-    )
-    return parser.parse_args()
+from industrial_vision.data.inspection import format_report, inspect_ksdd2
 
 
 def main() -> None:
-    args = parse_args()
-    inspection = inspect_dataset(args.data_dir)
-    print(format_inspection(inspection))
+    parser = argparse.ArgumentParser(description="Inspect the local KSDD2 dataset.")
+    parser.add_argument("data_dir", type=Path)
+    args = parser.parse_args()
+
+    report = inspect_ksdd2(args.data_dir)
+    print(format_report(args.data_dir, report))
 
 
 if __name__ == "__main__":
