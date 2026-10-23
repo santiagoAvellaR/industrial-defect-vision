@@ -32,30 +32,39 @@ data/raw/ksdd2/
 
 Each sample image has a mask with the same stem plus `_GT`.
 
-## Dataset inspection
+## Dataset validation
 
-Run:
+The validated dataset contains:
+
+- 3,335 samples;
+- 356 defective samples;
+- 2,979 defect-free samples;
+- official train set: 246 defective + 2,085 clean;
+- official test set: 110 defective + 894 clean;
+- no image/mask size mismatches.
+
+During inspection, two accidental local copies were found in `train/`:
+
+- `10301 (copy).png`;
+- `10301_GT (copy).png`.
+
+They were removed before creating the manifests because they are not part of the official dataset.
+
+Run the validation with:
 
 ```bash
 python scripts/inspect_dataset.py data/raw/ksdd2
 ```
 
-After removing two accidental local copies (`10301 (copy).png` and `10301_GT (copy).png`), the inspected dataset matches the official counts:
-
-- train: 2,331 samples = 246 defective + 2,085 clean;
-- test: 1,004 samples = 110 defective + 894 clean;
-- total: 3,335 samples = 356 defective + 2,979 clean;
-- no missing masks, orphan masks or image/mask size mismatches.
-
 ## Split policy
 
-The official KSDD2 test set stays untouched for final evaluation.
+The official test set remains untouched for final evaluation.
 
-The official training set is divided into train and validation subsets using a fixed seed and stratification by defect presence:
+The official training set is split deterministically with seed `42`, stratified by defect presence:
 
-- train: 80% of the official training set;
-- validation: 20% of the official training set;
-- test: official KSDD2 test set.
+- train: 1,865 samples = 197 defective + 1,668 clean;
+- validation: 466 samples = 49 defective + 417 clean;
+- test: 1,004 samples = 110 defective + 894 clean.
 
 Generate the manifests with:
 
@@ -63,20 +72,21 @@ Generate the manifests with:
 python scripts/create_splits.py data/raw/ksdd2
 ```
 
-Default settings:
-
-- seed: `42`;
-- validation fraction: `0.2`.
-
-The command writes:
+The generated files are stored in `data/splits/`:
 
 ```text
-data/splits/train.csv
-data/splits/val.csv
-data/splits/test.csv
+train.csv
+val.csv
+test.csv
 ```
 
-Each row stores the relative image path, mask path and binary defect label.
+Each row contains:
+
+```text
+image,mask,label
+```
+
+where `label=1` means the mask contains a defect and `label=0` means the mask is empty.
 
 ## M1 checks
 
