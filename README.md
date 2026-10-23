@@ -23,9 +23,9 @@ The project is intentionally built as an ML engineering system rather than a not
 
 ## Status
 
-**Current milestone: M0 — Repository foundation.**
+**Current milestone: M0 — Repository foundation (complete).**
 
-The local bootstrap is implemented. Dataset selection and all ML functionality start in M1 and later milestones.
+The repository foundation has been implemented and validated by GitHub Actions on Python 3.11, 3.12 and 3.13. Dataset selection and all ML functionality start in M1 and later milestones.
 
 ## Planned workflow
 
