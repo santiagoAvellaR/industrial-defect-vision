@@ -30,40 +30,53 @@ data/raw/ksdd2/
     └── ...
 ```
 
-Each sample image should have a mask with the same stem plus `_GT`.
+Each sample image has a mask with the same stem plus `_GT`.
 
-## Initial inspection
+## Dataset inspection
 
-The current local archive contains:
-
-- 6,672 PNG files;
-- 3,336 RGB images and 3,336 grayscale images;
-- 4,664 files under `train`;
-- 2,008 files under `test`;
-- 356 non-empty mask candidates;
-- no unreadable image files.
-
-This suggests 2,332 apparent training samples and 1,004 test samples. The official dataset summary reports 2,331 training samples and 1,004 test samples, so the local training set contains one extra or irregular sample that must be identified before the split is frozen.
-
-Run the project inspector with:
+Run:
 
 ```bash
 python scripts/inspect_dataset.py data/raw/ksdd2
 ```
 
+After removing two accidental local copies (`10301 (copy).png` and `10301_GT (copy).png`), the inspected dataset matches the official counts:
+
+- train: 2,331 samples = 246 defective + 2,085 clean;
+- test: 1,004 samples = 110 defective + 894 clean;
+- total: 3,335 samples = 356 defective + 2,979 clean;
+- no missing masks, orphan masks or image/mask size mismatches.
+
 ## Split policy
 
-The official test set stays untouched for final evaluation.
+The official KSDD2 test set stays untouched for final evaluation.
 
-After the extra training sample is understood, the official training set will be divided into train and validation subsets with a fixed seed and stratification by defect presence.
+The official training set is divided into train and validation subsets using a fixed seed and stratification by defect presence:
 
-Target proportions inside the official training set:
-
-- train: 80%;
-- validation: 20%;
+- train: 80% of the official training set;
+- validation: 20% of the official training set;
 - test: official KSDD2 test set.
 
-The resulting manifests will be stored under `data/splits/`.
+Generate the manifests with:
+
+```bash
+python scripts/create_splits.py data/raw/ksdd2
+```
+
+Default settings:
+
+- seed: `42`;
+- validation fraction: `0.2`.
+
+The command writes:
+
+```text
+data/splits/train.csv
+data/splits/val.csv
+data/splits/test.csv
+```
+
+Each row stores the relative image path, mask path and binary defect label.
 
 ## M1 checks
 
