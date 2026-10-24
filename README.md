@@ -23,11 +23,11 @@ The project is intentionally built as an ML engineering system rather than a not
 
 ## Status
 
-**Current milestone: M1 — Dataset & exploration.**
+**Current milestone: M2 — PyTorch CNN baseline.**
 
 M0 — repository foundation — is complete and validated by GitHub Actions on Python 3.11, 3.12 and 3.13.
 
-The primary dataset selected for M1 is **KolektorSDD2**, an industrial surface-defect dataset with defective/defect-free samples and pixel-level annotations suitable for the project progression from classification to segmentation.
+M1 — dataset & exploration — is complete. KSDD2 was inspected, split reproducibly, explored visually and statistically, loaded through PyTorch, and checked for exact cross-split duplicate leakage.
 
 ## Planned workflow
 
@@ -54,7 +54,7 @@ Docker
 ## Core milestones
 
 - [x] M0 — Repository foundation
-- [ ] M1 — Dataset & exploration
+- [x] M1 — Dataset & exploration
 - [ ] M2 — PyTorch CNN baseline
 - [ ] M3 — Transfer learning
 - [ ] M4 — Semantic segmentation
