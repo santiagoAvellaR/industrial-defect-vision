@@ -88,15 +88,53 @@ image,mask,label
 
 where `label=1` means the mask contains a defect and `label=0` means the mask is empty.
 
+## Exploratory findings
+
+The training images are similar in shape but not identical:
+
+- 479 unique image sizes;
+- width range: 184–241 pixels;
+- height range: 602–658 pixels;
+- common sizes are close to 230 × 638 pixels.
+
+Defects are usually small relative to the full image. Among the 197 positive training samples:
+
+- median defect area: 1.535% of pixels;
+- minimum defect area: 0.017%;
+- maximum defect area: 20.583%.
+
+This means pixel accuracy alone would be misleading for segmentation because a model could predict mostly background and still obtain a high value.
+
+## Initial preprocessing decision
+
+The first PyTorch pipeline uses a fixed size of **640 × 224 pixels (height × width)**.
+
+Why:
+
+- it is close to the typical original geometry;
+- both dimensions are divisible by 32, which is convenient for CNN encoder/decoder architectures;
+- fixed spatial dimensions allow samples to be stacked into batches;
+- cropping is avoided because very small defects could be removed entirely.
+
+Images are resized with bilinear interpolation. Masks are resized with nearest-neighbor interpolation so class labels remain discrete. Images are converted to float tensors in `[0, 1]`; masks are converted to binary tensors.
+
+This is a simple baseline preprocessing choice and can be revisited if later experiments show that aspect-ratio distortion is harmful.
+
 ## M1 checks
 
-Before training any model we will verify:
+Completed:
 
 - image and mask pairing;
 - mask/image spatial alignment;
 - positive/negative class balance;
-- image sizes and channels;
+- image-size exploration;
 - defect-area distribution;
+- reproducible train/validation split;
+- initial resize strategy;
+- PyTorch image/mask loader.
+
+Still to check before closing M1:
+
 - exact and obvious near-duplicates;
-- reproducibility of the train/validation split;
-- whether normalization or resizing is required.
+- a few real samples through the PyTorch loader and DataLoader;
+- final sample visualizations after preprocessing.
