@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Convolution kernel demo</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.5;
+    }
+
+    .layout {
+      display: flex;
+      gap: 36px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(7, 44px);
+      gap: 3px;
+    }
+
+    .cell,
+    .kernel-cell {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #999;
+      box-sizing: border-box;
+    }
+
+    .active {
+      outline: 3px solid currentColor;
+      outline-offset: -3px;
+      font-weight: 700;
+    }
+
+    .kernel {
+      display: grid;
+      grid-template-columns: repeat(3, 44px);
+      gap: 3px;
+    }
+
+    button {
+      padding: 8px 12px;
+      margin-right: 6px;
+      margin-top: 12px;
+      cursor: pointer;
+    }
+
+    code {
+      background: rgba(127, 127, 127, 0.15);
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .result {
+      margin-top: 18px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>Convolution kernel as a sliding patch</h1>
+
+  <p>
+    This is a deliberately simplified one-channel example. A <code>3×3</code>
+    kernel reads one local <code>3×3</code> patch, computes a weighted sum, then
+    moves to the next spatial position. In our real first CNN layer, each filter
+    spans all three RGB channels and its weights are learned during training.
+  </p>
+
+  <div class="layout">
+    <section>
+      <h2>Input image</h2>
+      <div id="image-grid" class="grid"></div>
+      <div>
+        <button id="previous">Previous</button>
+        <button id="next">Next</button>
+        <button id="reset">Reset</button>
+      </div>
+      <p id="position"></p>
+    </section>
+
+    <section>
+      <h2>Example 3×3 kernel</h2>
+      <div id="kernel-grid" class="kernel"></div>
+      <p>
+        These fixed weights are only illustrative. A CNN learns its filter
+        weights from data.
+      </p>
+      <p id="patch-values"></p>
+      <p id="result" class="result"></p>
+    </section>
+  </div>
+
+  <script>
+    const imageSize = 7;
+    const kernelSize = 3;
+    const positionsPerRow = imageSize - kernelSize + 1;
+
+    const image = Array.from(
+      { length: imageSize * imageSize },
+      (_, index) => index + 1,
+    );
+
+    const kernel = [
+      1, 0, -1,
+      1, 0, -1,
+      1, 0, -1,
+    ];
+
+    let positionIndex = 0;
+
+    const imageGrid = document.getElementById("image-grid");
+    const kernelGrid = document.getElementById("kernel-grid");
+    const positionText = document.getElementById("position");
+    const patchText = document.getElementById("patch-values");
+    const resultText = document.getElementById("result");
+
+    image.forEach((value) => {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = value;
+      imageGrid.appendChild(cell);
+    });
+
+    kernel.forEach((value) => {
+      const cell = document.createElement("div");
+      cell.className = "kernel-cell";
+      cell.textContent = value;
+      kernelGrid.appendChild(cell);
+    });
+
+    function currentRowColumn() {
+      return {
+        row: Math.floor(positionIndex / positionsPerRow),
+        column: positionIndex % positionsPerRow,
+      };
+    }
+
+    function patchIndices(row, column) {
+      const indices = [];
+      for (let dy = 0; dy < kernelSize; dy += 1) {
+        for (let dx = 0; dx < kernelSize; dx += 1) {
+          indices.push((row + dy) * imageSize + column + dx);
+        }
+      }
+      return indices;
+    }
+
+    function render() {
+      const { row, column } = currentRowColumn();
+      const indices = patchIndices(row, column);
+      const cells = [...imageGrid.children];
+
+      cells.forEach((cell, index) => {
+        cell.classList.toggle("active", indices.includes(index));
+      });
+
+      const patch = indices.map((index) => image[index]);
+      const output = patch.reduce(
+        (sum, value, index) => sum + value * kernel[index],
+        0,
+      );
+
+      positionText.textContent =
+        `Top-left kernel position: row ${row}, column ${column} (stride = 1)`;
+      patchText.textContent = `Current patch values: [${patch.join(", ")}]`;
+      resultText.textContent = `Weighted sum at this position: ${output}`;
+    }
+
+    document.getElementById("previous").addEventListener("click", () => {
+      positionIndex = Math.max(0, positionIndex - 1);
+      render();
+    });
+
+    document.getElementById("next").addEventListener("click", () => {
+      const lastIndex = positionsPerRow * positionsPerRow - 1;
+      positionIndex = Math.min(lastIndex, positionIndex + 1);
+      render();
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      positionIndex = 0;
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
