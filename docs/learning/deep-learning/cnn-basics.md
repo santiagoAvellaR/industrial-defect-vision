@@ -2,6 +2,8 @@
 
 This note explains the concepts used in `BaselineCNN` and connects each idea to the actual tensors that move through the model.
 
+The goal is not only to know the definitions, but to be able to follow one image through the network and explain what each layer does, why it is there and how the tensor changes.
+
 ## What is a CNN?
 
 A Convolutional Neural Network (CNN) is a neural network designed to learn spatial patterns in images.
@@ -65,11 +67,90 @@ The layer therefore changes:
 
 The 16 output channels are also called **feature maps**.
 
-Each output channel is produced by one learned filter. Because the input has 3 channels, one filter in the first convolution actually has shape:
+### Visual intuition: the kernel is a sliding patch
+
+A `3 × 3` kernel does not look at the whole image at once. It reads one local patch, computes one output value, then moves to the next position.
+
+```text
+Image
+
+┌───┬───┬───┬───┬───┐
+│ 1 │ 2 │ 3 │ 4 │ 5 │
+├───┼───┼───┼───┼───┤
+│ 6 │ 7 │ 8 │ 9 │10 │
+├───┼───┼───┼───┼───┤
+│11 │12 │13 │14 │15 │
+├───┼───┼───┼───┼───┤
+│16 │17 │18 │19 │20 │
+├───┼───┼───┼───┼───┤
+│21 │22 │23 │24 │25 │
+└───┴───┴───┴───┴───┘
+
+First 3×3 patch
+
+┏━━━┳━━━┳━━━┓
+┃ 1 ┃ 2 ┃ 3 ┃
+┣━━━╋━━━╋━━━┫
+┃ 6 ┃ 7 ┃ 8 ┃
+┣━━━╋━━━╋━━━┫
+┃11 ┃12 ┃13 ┃
+┗━━━┻━━━┻━━━┛
+
+With stride = 1, the kernel then moves one position to the right.
+```
+
+The interactive version is available at:
+
+`docs/learning/visuals/convolution-kernel-demo.html`
+
+That demo uses one channel and fixed example weights only to make the mechanism visible. In our real first layer, a filter spans all three RGB channels and its weights are learned during training.
+
+### One filter produces one feature map
+
+The same learned filter is reused at every spatial position.
+
+```mermaid
+flowchart LR
+    I[Input image] --> P1[3×3 patch at position 1]
+    I --> P2[3×3 patch at position 2]
+    I --> P3[3×3 patch at position ...]
+    P1 --> O1[one output value]
+    P2 --> O2[one output value]
+    P3 --> O3[one output value]
+    O1 --> F[feature map]
+    O2 --> F
+    O3 --> F
+```
+
+So:
+
+```text
+one learned filter
+        ↓
+one feature map
+```
+
+Our first convolution has 16 filters, so it produces 16 feature maps.
+
+Because the input has 3 channels, one filter in the first convolution actually has shape:
 
 ```text
 [3, 3, 3]
  input channels × kernel height × kernel width
+```
+
+A useful visual model is:
+
+```mermaid
+flowchart LR
+    RGB[3 input channels] --> C1[filter 1]
+    RGB --> C2[filter 2]
+    RGB --> C3[...]
+    RGB --> C16[filter 16]
+    C1 --> F1[feature map 1]
+    C2 --> F2[feature map 2]
+    C3 --> F3[...]
+    C16 --> F16[feature map 16]
 ```
 
 The filters are **learned during training**. We do not manually tell them to detect edges or textures. Early filters often learn simple visual patterns such as edges, contrasts or local textures, while later layers can combine simpler patterns into more complex representations.
@@ -86,7 +167,28 @@ Each of its 32 filters sees all 16 feature maps from the previous layer. Its out
 [B, 32, H, W]
 ```
 
-The third convolution does the same idea with `32 → 64` channels.
+The third convolution follows the same idea with `32 → 64` channels.
+
+## Channels and spatial size are different axes
+
+The first layer changes:
+
+```text
+[B, 3, 640, 224]
+        ↓ Conv 3→16
+[B,16, 640, 224]
+```
+
+The spatial size stays the same because we use `kernel_size=3`, `stride=1`, `padding=1`.
+
+The number of channels changes because we ask the layer to learn 16 different filters.
+
+This distinction is important:
+
+```text
+channels = learned representations
+H × W    = spatial resolution
+```
 
 ## Why channels increase
 
@@ -123,9 +225,13 @@ ReLU(x) = max(0, x)
 So:
 
 ```text
--2.0 → 0
- 0.0 → 0
- 3.2 → 3.2
+before ReLU     after ReLU
+
+ -2.0              0.0
+ -0.3              0.0
+  0.0              0.0
+  1.5              1.5
+  4.2              4.2
 ```
 
 ReLU introduces **non-linearity**.
@@ -134,7 +240,11 @@ This matters because convolution and linear layers are affine transformations. I
 
 ReLU breaks that purely linear composition and allows the network to represent much more complex relationships between image patterns and the final class.
 
-ReLU does not change tensor shape.
+ReLU changes values, not tensor shape:
+
+```text
+[B, C, H, W] → [B, C, H, W]
+```
 
 ## Max pooling
 
@@ -144,15 +254,16 @@ After each ReLU we use:
 nn.MaxPool2d(2)
 ```
 
-A `2 × 2` max-pooling operation looks at each small `2 × 2` region and keeps only its largest value.
-
-For example:
+A `2 × 2` max-pooling operation looks at each local region and keeps only its largest value.
 
 ```text
-1  5
-2  3
+┌───┬───┐
+│ 1 │ 5 │
+├───┼───┤
+│ 2 │ 3 │
+└───┴───┘
 
-→ 5
+MaxPool → 5
 ```
 
 With the default stride of 2, it halves both spatial dimensions:
@@ -173,52 +284,55 @@ The trade-off is that pooling also discards spatial information. That is accepta
 
 Our current architecture is:
 
+```mermaid
+flowchart TD
+    A[Input<br/>B × 3 × 640 × 224]
+    B[Conv 3→16<br/>B × 16 × 640 × 224]
+    C[ReLU]
+    D[MaxPool<br/>B × 16 × 320 × 112]
+    E[Conv 16→32<br/>B × 32 × 320 × 112]
+    F[ReLU]
+    G[MaxPool<br/>B × 32 × 160 × 56]
+    H[Conv 32→64<br/>B × 64 × 160 × 56]
+    I[ReLU]
+    J[MaxPool<br/>B × 64 × 80 × 28]
+    K[Global average pooling<br/>B × 64]
+    L[Linear 64→1<br/>B × 1]
+    M[squeeze<br/>B]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L --> M
+```
+
+The same flow as a table:
+
+| Stage | Shape |
+|---|---|
+| Input | `[B, 3, 640, 224]` |
+| Conv 3→16 | `[B, 16, 640, 224]` |
+| ReLU | `[B, 16, 640, 224]` |
+| MaxPool | `[B, 16, 320, 112]` |
+| Conv 16→32 | `[B, 32, 320, 112]` |
+| ReLU | `[B, 32, 320, 112]` |
+| MaxPool | `[B, 32, 160, 56]` |
+| Conv 32→64 | `[B, 64, 160, 56]` |
+| ReLU | `[B, 64, 160, 56]` |
+| MaxPool | `[B, 64, 80, 28]` |
+| Global average pooling | `[B, 64]` |
+| Linear 64→1 | `[B, 1]` |
+| `squeeze(1)` | `[B]` |
+
+The broad trend is:
+
 ```text
-Input
-[B, 3, 640, 224]
-
-Conv 3 → 16, 3×3, padding=1
-[B, 16, 640, 224]
-
-ReLU
-[B, 16, 640, 224]
-
-MaxPool 2×2
-[B, 16, 320, 112]
-
-Conv 16 → 32
-[B, 32, 320, 112]
-
-ReLU
-[B, 32, 320, 112]
-
-MaxPool 2×2
-[B, 32, 160, 56]
-
-Conv 32 → 64
-[B, 64, 160, 56]
-
-ReLU
-[B, 64, 160, 56]
-
-MaxPool 2×2
-[B, 64, 80, 28]
-
-Global average pooling
-[B, 64]
-
-Linear 64 → 1
-[B, 1]
-
-squeeze(1)
-[B]
+spatial resolution: 640×224 → 320×112 → 160×56 → 80×28
+channels:                    3 → 16 → 32 → 64
 ```
 
 ## Intermediate layers
 
 The convolution, ReLU and max-pooling operations form the **feature extractor**.
 
-Their job is not to output the final class directly. They transform the raw pixels into learned features that are easier to classify.
+Their job is not to output the final class directly. They transform raw pixels into learned features that are easier to classify.
 
 In our code, these layers live in:
 
@@ -233,6 +347,20 @@ self.classifier = nn.Linear(64, 1)
 ```
 
 It takes the learned 64-dimensional representation of each image and converts it into one classification score.
+
+A useful mental model is:
+
+```mermaid
+flowchart LR
+    A[Pixels] --> B[local patterns]
+    B --> C[richer feature maps]
+    C --> D[compressed representation]
+    D --> E[64-number vector]
+    E --> F[one logit]
+    F --> G[defect probability]
+```
+
+The feature extractor learns **what visual evidence exists**; the classifier head combines that evidence into the binary decision.
 
 ## Global average pooling
 
@@ -298,9 +426,9 @@ p(defect) = sigmoid(logit)
 Conceptually:
 
 ```text
-large negative logit → probability near 0 → likely clean
-logit near 0         → probability near 0.5
-large positive logit → probability near 1 → likely defective
+large negative logit ───── 0 ───── large positive logit
+      likely clean        0.5         likely defective
+                         after sigmoid
 ```
 
 With a probability threshold of `0.5`:
@@ -312,36 +440,83 @@ p ≥ 0.5 → defective
 
 Because `sigmoid(0) = 0.5`, this is equivalent to using a logit threshold of `0`.
 
-During training we will use `BCEWithLogitsLoss`. It expects raw logits and internally combines the binary cross-entropy calculation with the sigmoid operation in a numerically stable way. We therefore should not apply sigmoid before passing predictions to that loss.
+### Why one output neuron?
 
-## What each part is doing
+Our problem is binary:
 
 ```text
-raw RGB image
-    ↓
-convolutions
+clean vs defective
+```
+
+One logit is enough to model `P(defective)`. Once that probability is known:
+
+```text
+P(clean) = 1 - P(defective)
+```
+
+A two-output softmax classifier would also work, but it would be unnecessary for this simple binary case.
+
+## Where `BCEWithLogitsLoss` fits
+
+During training we will use `BCEWithLogitsLoss`.
+
+It expects raw logits and internally combines the binary cross-entropy calculation with the sigmoid operation in a numerically stable way.
+
+So we should **not** apply sigmoid before passing predictions to the loss.
+
+Conceptually:
+
+```text
+logit + true label
+      ↓
+BCEWithLogitsLoss
+      ↓
+loss
+```
+
+A confident wrong prediction should produce a large loss, while a confident correct prediction should produce a small loss.
+
+## The complete mental model
+
+```text
+RGB image
+   ↓
+Conv
 learn local visual patterns
-    ↓
+   ↓
 ReLU
 introduce non-linearity
-    ↓
-max pooling
+   ↓
+MaxPool
 reduce spatial resolution
-    ↓
-deeper convolutions
-combine simple features into richer features
-    ↓
-global average pooling
-summarize each final feature map
-    ↓
-linear output layer
-combine the 64 features into one score
-    ↓
-logit
-raw binary classification score
-    ↓
-sigmoid (for interpretation)
-probability of defect
+   ↓
+Conv
+combine earlier patterns
+   ↓
+ReLU
+   ↓
+MaxPool
+   ↓
+Conv
+build richer features
+   ↓
+ReLU
+   ↓
+MaxPool
+   ↓
+64 feature maps
+   ↓
+Global Average Pool
+   ↓
+64 numbers
+   ↓
+Linear
+   ↓
+1 logit
+   ↓
+Sigmoid for interpretation
+   ↓
+P(defect)
 ```
 
 ## Parameter count
@@ -401,8 +576,10 @@ GELU, SiLU and LeakyReLU are common alternatives. ReLU is used here because it i
 
 - Thinking convolution filters are manually chosen. Their weights are learned during training.
 - Confusing channels with spatial dimensions.
+- Thinking a kernel sees the entire image at once instead of a local patch.
 - Assuming ReLU changes tensor size. It changes values, not shape.
 - Assuming max pooling increases channels. It reduces spatial dimensions only.
+- Confusing max pooling with global average pooling.
 - Applying the same interpolation idea to images and segmentation masks. Masks represent discrete labels.
 - Treating a logit as a probability.
 - Applying sigmoid before `BCEWithLogitsLoss`.
@@ -418,21 +595,23 @@ A concise explanation of our baseline could be:
 ## Questions I should be able to answer
 
 1. What does `Conv2d(3, 16, kernel_size=3, padding=1)` mean?
-2. Why does the first convolution output 16 channels?
-3. Why does a convolutional filter span all input channels?
-4. Why do we need a non-linear activation such as ReLU?
-5. What would happen if every layer were linear?
-6. What does max pooling do to `H`, `W` and `C`?
-7. What is the difference between max pooling and global average pooling?
-8. Why do channels increase while spatial dimensions decrease?
-9. What is a feature map?
-10. What is a logit and how is it converted into a probability?
-11. Why does our binary classifier have one output neuron instead of two?
-12. Why should we not apply sigmoid before `BCEWithLogitsLoss`?
-13. Why is this architecture suitable as a baseline but not necessarily as the final model?
+2. Why does a `3 × 3` kernel behave like a sliding patch?
+3. Why does the first convolution output 16 channels?
+4. Why does a convolutional filter span all input channels?
+5. Why do we need a non-linear activation such as ReLU?
+6. What would happen if every layer were linear?
+7. What does max pooling do to `H`, `W` and `C`?
+8. What is the difference between max pooling and global average pooling?
+9. Why do channels increase while spatial dimensions decrease?
+10. What is a feature map?
+11. What is a logit and how is it converted into a probability?
+12. Why does our binary classifier have one output neuron instead of two?
+13. Why should we not apply sigmoid before `BCEWithLogitsLoss`?
+14. Why is this architecture suitable as a baseline but not necessarily as the final model?
 
 ## Evidence
 
 - Code: `src/industrial_vision/models/baseline_cnn.py`
 - Test: `tests/test_baseline_cnn.py`
+- Interactive convolution demo: `docs/learning/visuals/convolution-kernel-demo.html`
 - Baseline implementation commit: `d2a540d`
