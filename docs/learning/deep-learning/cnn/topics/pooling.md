@@ -29,6 +29,12 @@ MaxPool 2×2
 8  6
 ```
 
+For one local pooling region $R$ with activation values $a_{i,j}$, MaxPool computes:
+
+$$
+y = \max_{(i,j)\in R} a_{i,j}
+$$
+
 So:
 
 ```text
@@ -116,6 +122,14 @@ features.mean(dim=(2, 3))
 
 which averages over `H` and `W`.
 
+For feature map $c$, global average pooling computes:
+
+$$
+g_c = \frac{1}{HW}\sum_{i=1}^{H}\sum_{j=1}^{W} a_{c,i,j}
+$$
+
+where $a_{c,i,j}$ is the activation of channel $c$ at spatial position $(i,j)$, and $g_c$ is the single value kept for that feature map.
+
 ### Tiny numerical example
 
 Suppose one feature map is:
@@ -125,11 +139,11 @@ Suppose one feature map is:
 2  6
 ```
 
-Global average pooling calculates:
+Then:
 
-```text
-(1 + 3 + 2 + 6) / 4 = 3
-```
+$$
+\operatorname{GAP} = \frac{1+3+2+6}{4} = 3
+$$
 
 That entire feature map becomes one number.
 
@@ -218,6 +232,12 @@ Flatten combines dimensions into one.
 
 No values are removed; their arrangement is changed into one long vector.
 
+The number of values per image would be:
+
+$$
+64\times 80\times 28 = 143{,}360
+$$
+
 ### Squeeze
 
 `squeeze` removes a dimension only if its size is `1`.
@@ -260,15 +280,9 @@ No prediction is discarded. Only a redundant size-1 dimension is removed.
 
 ## Why use GAP instead of flattening here?
 
-Flattening the final tensor would produce:
+Flattening preserves all remaining spatial values, while GAP deliberately collapses each feature map to one average response.
 
-```text
-64 × 80 × 28 = 143,360
-```
-
-values per image before the classifier.
-
-GAP instead gives only 64 values, keeping the classification head small and reducing parameter count and overfitting risk.
+For our final tensor, flattening would create $143{,}360$ values per image before the classifier, whereas GAP gives only $64$ values. This keeps the classification head small and reduces parameter count and overfitting risk.
 
 ## Questions to be able to answer
 
@@ -277,7 +291,7 @@ GAP instead gives only 64 values, keeping the classification head small and redu
 3. What information does MaxPool discard?
 4. Does MaxPool change the number of channels?
 5. Why is spatial compression acceptable for classification but more delicate for segmentation?
-6. What does global average pooling calculate?
+6. What does global average pooling calculate mathematically?
 7. What information does GAP discard?
 8. What is the difference between MaxPool and GAP?
 9. What is the difference between `flatten` and `squeeze`?
