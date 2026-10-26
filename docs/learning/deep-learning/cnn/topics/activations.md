@@ -6,11 +6,11 @@ After each convolution in the baseline we use:
 nn.ReLU()
 ```
 
-ReLU is:
+ReLU is defined as:
 
-```text
-ReLU(x) = max(0, x)
-```
+$$
+\operatorname{ReLU}(x) = \max(0, x)
+$$
 
 So:
 
@@ -48,6 +48,12 @@ ReLU is then applied element-by-element:
 
 The values after the activation function are called **activations**.
 
+For one value, if the convolution produces a pre-activation $z$, the activation is:
+
+$$
+a = \operatorname{ReLU}(z)
+$$
+
 Mental model:
 
 ```text
@@ -66,13 +72,25 @@ activation a
 
 A convolution or linear layer is an affine transformation. If we compose only affine transformations, the whole stack can still be represented as one affine transformation.
 
-```text
-affine → affine → affine
+For example, composing two affine functions,
 
-can collapse to
+$$
+f(x) = Ax + b
+$$
 
-one affine transformation
-```
+and
+
+$$
+g(x) = Cx + d,
+$$
+
+gives:
+
+$$
+g(f(x)) = C(Ax+b)+d = (CA)x + (Cb+d),
+$$
+
+which is still affine.
 
 A non-linear activation prevents that global collapse and greatly increases the functions a deep network can represent.
 
@@ -82,16 +100,15 @@ Correct.
 
 ReLU is globally non-linear because its rule changes at zero:
 
-```text
-x < 0  → 0
-x ≥ 0  → x
-```
+$$
+\operatorname{ReLU}(x) =
+\begin{cases}
+0, & x < 0 \\
+x, & x \ge 0
+\end{cases}
+$$
 
-But in a region where all relevant pre-activations are positive:
-
-```text
-ReLU(x) = x
-```
+But in a region where all relevant pre-activations are positive, $\operatorname{ReLU}(x)=x$.
 
 So for that local input region the network can behave like an affine function.
 
@@ -107,12 +124,17 @@ There is no mathematical law saying negative values are “bad”. ReLU is a des
 
 Its derivative is:
 
-```text
-x < 0  → derivative 0
-x > 0  → derivative 1
-```
+$$
+\frac{d}{dx}\operatorname{ReLU}(x) =
+\begin{cases}
+0, & x < 0 \\
+1, & x > 0
+\end{cases}
+$$
 
-On the positive side it lets the activation pass unchanged and, during backpropagation, does not shrink the gradient because of the activation itself.
+At $x=0$ the derivative is not uniquely defined mathematically; implementations choose a convention for backpropagation.
+
+On the positive side, the derivative is $1$, so the activation itself does not shrink the gradient there.
 
 The negative side acts like a gate that turns that response off.
 
@@ -144,7 +166,7 @@ Advantages:
 
 - simple;
 - very cheap;
-- positive side has derivative 1;
+- positive side has derivative $1$;
 - strong historical default for CNNs;
 - easy to understand for a baseline.
 
@@ -157,6 +179,18 @@ Main drawback:
 
 Keeps a small non-zero slope on the negative side.
 
+A common form is:
+
+$$
+f(x) =
+\begin{cases}
+x, & x \ge 0 \\
+\alpha x, & x < 0
+\end{cases}
+$$
+
+with a small $\alpha > 0$.
+
 ### GELU
 
 Smooth activation widely used in Transformers and other modern architectures.
@@ -167,7 +201,7 @@ Smooth activation used successfully in several modern CNNs.
 
 ### Sigmoid
 
-Maps values to `(0,1)` and is useful for probability interpretation, but hidden layers can suffer from saturation and small gradients.
+Maps real values to $(0,1)$ and is useful for probability interpretation, but hidden layers can suffer from saturation and small gradients.
 
 ## Why we use ReLU here
 
