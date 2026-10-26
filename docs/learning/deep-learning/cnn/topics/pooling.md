@@ -31,9 +31,9 @@ MaxPool 2×2
 
 For one local pooling region $R$ with activation values $a_{i,j}$, MaxPool computes:
 
-$$
+```math
 y = \max_{(i,j)\in R} a_{i,j}
-$$
+```
 
 So:
 
@@ -124,9 +124,9 @@ which averages over `H` and `W`.
 
 For feature map $c$, global average pooling computes:
 
-$$
+```math
 g_c = \frac{1}{HW}\sum_{i=1}^{H}\sum_{j=1}^{W} a_{c,i,j}
-$$
+```
 
 where $a_{c,i,j}$ is the activation of channel $c$ at spatial position $(i,j)$, and $g_c$ is the single value kept for that feature map.
 
@@ -141,9 +141,9 @@ Suppose one feature map is:
 
 Then:
 
-$$
-\operatorname{GAP} = \frac{1+3+2+6}{4} = 3
-$$
+```math
+\mathrm{GAP} = \frac{1+3+2+6}{4} = 3
+```
 
 That entire feature map becomes one number.
 
@@ -234,9 +234,9 @@ No values are removed; their arrangement is changed into one long vector.
 
 The number of values per image would be:
 
-$$
+```math
 64\times 80\times 28 = 143{,}360
-$$
+```
 
 ### Squeeze
 
