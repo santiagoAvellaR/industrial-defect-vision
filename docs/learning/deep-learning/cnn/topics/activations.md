@@ -8,9 +8,9 @@ nn.ReLU()
 
 ReLU is defined as:
 
-$$
-\operatorname{ReLU}(x) = \max(0, x)
-$$
+```math
+\mathrm{ReLU}(x) = \max(0, x)
+```
 
 So:
 
@@ -50,9 +50,9 @@ The values after the activation function are called **activations**.
 
 For one value, if the convolution produces a pre-activation $z$, the activation is:
 
-$$
-a = \operatorname{ReLU}(z)
-$$
+```math
+a = \mathrm{ReLU}(z)
+```
 
 Mental model:
 
@@ -74,21 +74,21 @@ A convolution or linear layer is an affine transformation. If we compose only af
 
 For example, composing two affine functions,
 
-$$
+```math
 f(x) = Ax + b
-$$
+```
 
 and
 
-$$
-g(x) = Cx + d,
-$$
+```math
+g(x) = Cx + d
+```
 
 gives:
 
-$$
-g(f(x)) = C(Ax+b)+d = (CA)x + (Cb+d),
-$$
+```math
+g(f(x)) = C(Ax+b)+d = (CA)x + (Cb+d)
+```
 
 which is still affine.
 
@@ -100,15 +100,15 @@ Correct.
 
 ReLU is globally non-linear because its rule changes at zero:
 
-$$
-\operatorname{ReLU}(x) =
+```math
+\mathrm{ReLU}(x) =
 \begin{cases}
 0, & x < 0 \\
 x, & x \ge 0
 \end{cases}
-$$
+```
 
-But in a region where all relevant pre-activations are positive, $\operatorname{ReLU}(x)=x$.
+But in a region where all relevant pre-activations are positive, $\mathrm{ReLU}(x)=x$.
 
 So for that local input region the network can behave like an affine function.
 
@@ -124,13 +124,13 @@ There is no mathematical law saying negative values are “bad”. ReLU is a des
 
 Its derivative is:
 
-$$
-\frac{d}{dx}\operatorname{ReLU}(x) =
+```math
+\frac{d}{dx}\mathrm{ReLU}(x) =
 \begin{cases}
 0, & x < 0 \\
 1, & x > 0
 \end{cases}
-$$
+```
 
 At $x=0$ the derivative is not uniquely defined mathematically; implementations choose a convention for backpropagation.
 
@@ -181,13 +181,13 @@ Keeps a small non-zero slope on the negative side.
 
 A common form is:
 
-$$
+```math
 f(x) =
 \begin{cases}
 x, & x \ge 0 \\
 \alpha x, & x < 0
 \end{cases}
-$$
+```
 
 with a small $\alpha > 0$.
 
