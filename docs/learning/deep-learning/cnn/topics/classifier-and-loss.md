@@ -46,17 +46,17 @@ For our convention, positive logits indicate stronger evidence for the positive 
 
 ## From logit to probability: sigmoid
 
-Sigmoid converts a logit $z\in\mathbb{R}$ into a probability-like value between 0 and 1:
+Sigmoid converts a logit $z\in\mathbb{R}$ into a value between 0 and 1:
 
-$$
+```math
 \sigma(z) = \frac{1}{1+e^{-z}}
-$$
+```
 
 For our binary classifier:
 
-$$
-p = P(y=1\mid x) = P(\text{defect}\mid x) = \sigma(z)
-$$
+```math
+p = P(y=1\mid x) = P(\mathrm{defect}\mid x) = \sigma(z)
+```
 
 So:
 
@@ -68,17 +68,17 @@ large positive logit → p near 1
 
 For example:
 
-$$
+```math
 \sigma(2) \approx 0.881,
 \qquad
 \sigma(-2) \approx 0.119
-$$
+```
 
 One output is sufficient because:
 
-$$
-P(\text{clean}\mid x) = 1 - P(\text{defect}\mid x)
-$$
+```math
+P(\mathrm{clean}\mid x) = 1 - P(\mathrm{defect}\mid x)
+```
 
 A two-output softmax classifier could also solve the task, but would add unnecessary complexity for this binary baseline.
 
@@ -102,11 +102,11 @@ Conceptually, first imagine converting the logit into $p=\sigma(z)$.
 
 Binary Cross Entropy for one sample is:
 
-$$
-\mathcal{L}_{\text{BCE}}(y,p)
+```math
+\mathcal{L}_{\mathrm{BCE}}(y,p)
 =
 -\left[y\log(p) + (1-y)\log(1-p)\right]
-$$
+```
 
 The formula becomes simpler because $y$ is either 0 or 1.
 
@@ -114,21 +114,21 @@ The formula becomes simpler because $y$ is either 0 or 1.
 
 Substituting $y=1$ gives:
 
-$$
-\mathcal{L}_{\text{BCE}} = -\log(p)
-$$
+```math
+\mathcal{L}_{\mathrm{BCE}} = -\log(p)
+```
 
 For a good prediction such as $p=0.90$:
 
-$$
+```math
 -\log(0.90) \approx 0.105
-$$
+```
 
 For a confident wrong prediction such as $p=0.10$:
 
-$$
+```math
 -\log(0.10) \approx 2.303
-$$
+```
 
 So a correct confident prediction receives small loss and a confident wrong prediction receives large loss.
 
@@ -136,21 +136,21 @@ So a correct confident prediction receives small loss and a confident wrong pred
 
 Substituting $y=0$ gives:
 
-$$
-\mathcal{L}_{\text{BCE}} = -\log(1-p)
-$$
+```math
+\mathcal{L}_{\mathrm{BCE}} = -\log(1-p)
+```
 
 If the model assigns only $p=0.10$ probability to defect:
 
-$$
+```math
 -\log(1-0.10) = -\log(0.90) \approx 0.105
-$$
+```
 
 But if it assigns $p=0.90$ probability to defect:
 
-$$
+```math
 -\log(1-0.90) = -\log(0.10) \approx 2.303
-$$
+```
 
 Again, confident wrong predictions are strongly penalized.
 
@@ -171,7 +171,7 @@ wrong + confident
 
 For a positive example ($y=1$):
 
-| $P(\text{defect})$ | Approx. loss |
+| $P(\mathrm{defect})$ | Approx. loss |
 |---:|---:|
 | 0.99 | 0.01 |
 | 0.90 | 0.11 |
@@ -202,11 +202,11 @@ nn.BCEWithLogitsLoss()
 
 combines sigmoid and BCE into one numerically stable expression. For one sample, an equivalent stable form is:
 
-$$
+```math
 \mathcal{L}(z,y)
 =
 \max(z,0) - zy + \log\left(1+e^{-|z|}\right)
-$$
+```
 
 This computes the same binary classification objective without explicitly forming a potentially extreme probability first.
 
@@ -244,19 +244,19 @@ labels = [ 1.0,  0.0, 1.0,  0.0]
 
 The loss is calculated for each prediction-label pair. With PyTorch's default `reduction="mean"`, the batch loss is:
 
-$$
-\mathcal{L}_{\text{batch}}
+```math
+\mathcal{L}_{\mathrm{batch}}
 =
 \frac{1}{B}\sum_{i=1}^{B}\mathcal{L}_i
-$$
+```
 
 For a batch of four samples:
 
-$$
-\mathcal{L}_{\text{batch}}
+```math
+\mathcal{L}_{\mathrm{batch}}
 =
 \frac{\mathcal{L}_1+\mathcal{L}_2+\mathcal{L}_3+\mathcal{L}_4}{4}
-$$
+```
 
 So the final `loss` is one scalar for the batch.
 
@@ -296,11 +296,11 @@ updated parameters
 
 We will derive gradients later, but one elegant result for one binary example is:
 
-$$
+```math
 \frac{\partial \mathcal{L}}{\partial z}
 =
 \sigma(z)-y
-$$
+```
 
 This already gives useful intuition:
 
