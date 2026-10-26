@@ -20,6 +20,26 @@ Keep related concepts together when they make sense to study as one unit. Do not
 
 The goal is that, months later, a concept can be recovered directly: if the question is about tensors, open the tensor note; if it is about pooling, open the pooling note.
 
+## Mathematics
+
+Use the same canonical Markdown math convention as the study repositories:
+
+- inline math: `$...$`;
+- display math: `$$...$$`;
+- do not introduce `\(...\)` or `\[...\]` in canonical notes.
+
+Important equations should be readable, not only correct. Define non-trivial notation near first use and follow important equations with a plain-language interpretation.
+
+Use LaTeX for actual mathematical relationships such as activation functions, losses, derivatives and equations. Keep tensor shapes such as `[B, C, H, W]` as code when the goal is to describe a software data structure rather than write a mathematical equation.
+
+Run:
+
+```bash
+python scripts/check_markdown_math.py
+```
+
+to validate canonical delimiters locally. CI runs the same check.
+
 ## Visual explanations
 
 When a concept is spatial, graphical, or hard to picture from prose alone, add a visual if it materially improves understanding.
