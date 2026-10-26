@@ -46,17 +46,17 @@ For our convention, positive logits indicate stronger evidence for the positive 
 
 ## From logit to probability: sigmoid
 
-Sigmoid converts a logit `z` into a number between 0 and 1:
+Sigmoid converts a logit $z\in\mathbb{R}$ into a probability-like value between 0 and 1:
 
-```text
-p = sigmoid(z) = 1 / (1 + exp(-z))
-```
+$$
+\sigma(z) = \frac{1}{1+e^{-z}}
+$$
 
-For us:
+For our binary classifier:
 
-```text
-p = P(defect)
-```
+$$
+p = P(y=1\mid x) = P(\text{defect}\mid x) = \sigma(z)
+$$
 
 So:
 
@@ -66,18 +66,19 @@ logit = 0            → p = 0.5
 large positive logit → p near 1
 ```
 
-Examples:
+For example:
 
-```text
-z =  2 → sigmoid(z) ≈ 0.881
-z = -2 → sigmoid(z) ≈ 0.119
-```
+$$
+\sigma(2) \approx 0.881,
+\qquad
+\sigma(-2) \approx 0.119
+$$
 
 One output is sufficient because:
 
-```text
-P(clean) = 1 - P(defect)
-```
+$$
+P(\text{clean}\mid x) = 1 - P(\text{defect}\mid x)
+$$
 
 A two-output softmax classifier could also solve the task, but would add unnecessary complexity for this binary baseline.
 
@@ -93,61 +94,63 @@ It answers:
 
 > How incompatible is the model's raw prediction with the true binary label?
 
-Its inputs are:
-
-```text
-logit z
-+
-true label y ∈ {0,1}
-```
+Its inputs are a raw logit $z$ and a true label $y\in\{0,1\}$.
 
 ## Binary Cross Entropy
 
-Conceptually, first imagine converting the logit into:
+Conceptually, first imagine converting the logit into $p=\sigma(z)$.
 
-```text
-p = P(defect)
-```
+Binary Cross Entropy for one sample is:
 
-Binary Cross Entropy is:
+$$
+\mathcal{L}_{\text{BCE}}(y,p)
+=
+-\left[y\log(p) + (1-y)\log(1-p)\right]
+$$
 
-```text
-BCE = -[y log(p) + (1-y) log(1-p)]
-```
+The formula becomes simpler because $y$ is either 0 or 1.
 
-The formula becomes simpler because `y` is either 0 or 1.
+### True label $y=1$ — defective
 
-### True label `y = 1` — defective
+Substituting $y=1$ gives:
 
-Then:
+$$
+\mathcal{L}_{\text{BCE}} = -\log(p)
+$$
 
-```text
-BCE = -log(p)
-```
+For a good prediction such as $p=0.90$:
 
-Examples:
+$$
+-\log(0.90) \approx 0.105
+$$
 
-```text
-p = 0.90 → loss ≈ 0.105
-p = 0.10 → loss ≈ 2.303
-```
+For a confident wrong prediction such as $p=0.10$:
+
+$$
+-\log(0.10) \approx 2.303
+$$
 
 So a correct confident prediction receives small loss and a confident wrong prediction receives large loss.
 
-### True label `y = 0` — clean
+### True label $y=0$ — clean
 
-Then:
+Substituting $y=0$ gives:
 
-```text
-BCE = -log(1-p)
-```
+$$
+\mathcal{L}_{\text{BCE}} = -\log(1-p)
+$$
 
-Examples:
+If the model assigns only $p=0.10$ probability to defect:
 
-```text
-p(defect) = 0.10 → loss ≈ 0.105
-p(defect) = 0.90 → loss ≈ 2.303
-```
+$$
+-\log(1-0.10) = -\log(0.90) \approx 0.105
+$$
+
+But if it assigns $p=0.90$ probability to defect:
+
+$$
+-\log(1-0.90) = -\log(0.10) \approx 2.303
+$$
 
 Again, confident wrong predictions are strongly penalized.
 
@@ -166,9 +169,9 @@ wrong + confident
 → large loss
 ```
 
-For a positive example (`y=1`):
+For a positive example ($y=1$):
 
-| P(defect) | Approx. loss |
+| $P(\text{defect})$ | Approx. loss |
 |---:|---:|
 | 0.99 | 0.01 |
 | 0.90 | 0.11 |
@@ -197,7 +200,15 @@ PyTorch's:
 nn.BCEWithLogitsLoss()
 ```
 
-combines the sigmoid-related calculation and binary cross entropy into a numerically stable formulation.
+combines sigmoid and BCE into one numerically stable expression. For one sample, an equivalent stable form is:
+
+$$
+\mathcal{L}(z,y)
+=
+\max(z,0) - zy + \log\left(1+e^{-|z|}\right)
+$$
+
+This computes the same binary classification objective without explicitly forming a potentially extreme probability first.
 
 Therefore the training flow is:
 
@@ -231,20 +242,21 @@ logits = [ 2.1, -1.4, 0.3, -0.7]
 labels = [ 1.0,  0.0, 1.0,  0.0]
 ```
 
-The loss is calculated for each prediction-label pair:
+The loss is calculated for each prediction-label pair. With PyTorch's default `reduction="mean"`, the batch loss is:
 
-```text
-2.1  ↔ 1 → loss₁
--1.4 ↔ 0 → loss₂
-0.3  ↔ 1 → loss₃
--0.7 ↔ 0 → loss₄
-```
+$$
+\mathcal{L}_{\text{batch}}
+=
+\frac{1}{B}\sum_{i=1}^{B}\mathcal{L}_i
+$$
 
-By default, PyTorch returns the mean of those losses:
+For a batch of four samples:
 
-```text
-(loss₁ + loss₂ + loss₃ + loss₄) / 4
-```
+$$
+\mathcal{L}_{\text{batch}}
+=
+\frac{\mathcal{L}_1+\mathcal{L}_2+\mathcal{L}_3+\mathcal{L}_4}{4}
+$$
 
 So the final `loss` is one scalar for the batch.
 
@@ -284,19 +296,16 @@ updated parameters
 
 We will derive gradients later, but one elegant result for one binary example is:
 
-```text
-d(loss) / d(logit) = sigmoid(logit) - label
-```
+$$
+\frac{\partial \mathcal{L}}{\partial z}
+=
+\sigma(z)-y
+$$
 
-Intuitively:
+This already gives useful intuition:
 
-```text
-prediction too high
-→ gradient pushes the logit downward
-
-prediction too low
-→ gradient pushes the logit upward
-```
+- if the predicted probability is too high relative to the label, the gradient is positive and gradient descent will tend to push the logit downward;
+- if the predicted probability is too low relative to the label, the gradient is negative and gradient descent will tend to push the logit upward.
 
 This is only a preview; gradients and backpropagation deserve their own note rather than being treated as a black box here.
 
@@ -306,7 +315,7 @@ This is only a preview; gradients and backpropagation deserve their own note rat
 2. What is a logit?
 3. Why is a logit not a probability?
 4. Why is one output enough for binary classification?
-5. What does sigmoid do?
+5. What does sigmoid do mathematically?
 6. What does Binary Cross Entropy measure?
 7. Why is a confident wrong prediction strongly penalized?
 8. Why does `BCEWithLogitsLoss` expect raw logits?
