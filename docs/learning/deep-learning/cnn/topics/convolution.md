@@ -47,6 +47,30 @@ image patch             kernel weights
           one output value
 ```
 
+For one output filter $k$ at spatial position $(i,j)$, the convolution can be written conceptually as:
+
+$$
+z_{k,i,j}
+=
+b_k
++
+\sum_{c=1}^{C_{\text{in}}}
+\sum_{u=1}^{K_h}
+\sum_{v=1}^{K_w}
+W_{k,c,u,v}\,X_{c,i+u,j+v}
+$$
+
+where:
+
+- $X$ is the input tensor;
+- $W$ contains the learned filter weights;
+- $b_k$ is the bias of output filter $k$;
+- $c$ indexes input channels;
+- $(u,v)$ indexes positions inside the kernel;
+- $z_{k,i,j}$ is one output value before the activation function.
+
+The key idea is simpler than the notation: multiply the local patch by the learned weights, sum the contributions from all input channels, add the bias, and obtain one number.
+
 The kernel weights stay the same while the patch changes as the operation moves across the image.
 
 For RGB, one complete filter has shape:
@@ -77,6 +101,20 @@ stride ≈ spatial delta between consecutive positions
 ```
 
 A larger stride samples fewer positions and usually reduces output spatial resolution.
+
+Ignoring dilation, one spatial output dimension follows:
+
+$$
+N_{\text{out}}
+=
+\left\lfloor
+\frac{N_{\text{in}} + 2P - K}{S}
+\right\rfloor + 1
+$$
+
+where $N_{\text{in}}$ is the input size, $K$ the kernel size, $P$ the padding and $S$ the stride.
+
+For our convolutions, $K=3$, $P=1$ and $S=1$, so $N_{\text{out}}=N_{\text{in}}$: the convolution preserves spatial size.
 
 ## One filter produces one feature map
 
@@ -172,7 +210,7 @@ stride = 1
 padding = 1
 ```
 
-Padding compensates for what would otherwise be lost at the borders:
+As shown by the output-size equation above, this combination preserves both spatial dimensions:
 
 ```text
 640 × 224
@@ -223,10 +261,12 @@ For segmentation, spatial detail matters much more because the model must also a
 1. Why is a CNN called convolutional?
 2. What is the difference between a patch, a kernel and a filter?
 3. What does `Conv2d(3, 16, kernel_size=3, padding=1)` mean?
-4. What is stride?
-5. Why does one filter produce one feature map?
-6. Why do we get 16 feature maps?
-7. Can we always assign one human meaning to one learned filter?
-8. What is the difference between channels, spatial size and kernel size?
-9. Why does our convolution keep `640×224`?
-10. Which operation actually reduces spatial size in our baseline?
+4. What does the convolution equation compute at one spatial position?
+5. What is stride?
+6. How do kernel size, padding and stride determine the output spatial size?
+7. Why does one filter produce one feature map?
+8. Why do we get 16 feature maps?
+9. Can we always assign one human meaning to one learned filter?
+10. What is the difference between channels, spatial size and kernel size?
+11. Why does our convolution keep `640×224`?
+12. Which operation actually reduces spatial size in our baseline?
