@@ -49,16 +49,16 @@ image patch             kernel weights
 
 For one output filter $k$ at spatial position $(i,j)$, the convolution can be written conceptually as:
 
-$$
+```math
 z_{k,i,j}
 =
 b_k
 +
-\sum_{c=1}^{C_{\text{in}}}
+\sum_{c=1}^{C_{\mathrm{in}}}
 \sum_{u=1}^{K_h}
 \sum_{v=1}^{K_w}
 W_{k,c,u,v}\,X_{c,i+u,j+v}
-$$
+```
 
 where:
 
@@ -104,17 +104,17 @@ A larger stride samples fewer positions and usually reduces output spatial resol
 
 Ignoring dilation, one spatial output dimension follows:
 
-$$
-N_{\text{out}}
+```math
+N_{\mathrm{out}}
 =
 \left\lfloor
-\frac{N_{\text{in}} + 2P - K}{S}
+\frac{N_{\mathrm{in}} + 2P - K}{S}
 \right\rfloor + 1
-$$
+```
 
-where $N_{\text{in}}$ is the input size, $K$ the kernel size, $P$ the padding and $S$ the stride.
+where $N_{\mathrm{in}}$ is the input size, $K$ the kernel size, $P$ the padding and $S$ the stride.
 
-For our convolutions, $K=3$, $P=1$ and $S=1$, so $N_{\text{out}}=N_{\text{in}}$: the convolution preserves spatial size.
+For our convolutions, $K=3$, $P=1$ and $S=1$, so $N_{\mathrm{out}}=N_{\mathrm{in}}$: the convolution preserves spatial size.
 
 ## One filter produces one feature map
 
