@@ -22,11 +22,23 @@ The goal is that, months later, a concept can be recovered directly: if the ques
 
 ## Mathematics
 
-Use the same canonical Markdown math convention as the study repositories:
+Use GitHub-compatible Markdown math consistently:
 
 - inline math: `$...$`;
-- display math: `$$...$$`;
-- do not introduce `\(...\)` or `\[...\]` in canonical notes.
+- display math: fenced `math` blocks;
+- do not introduce `\(...\)`, `\[...\]` or raw `$$...$$` blocks in canonical notes.
+
+For example:
+
+````markdown
+```math
+\frac{1}{N}\sum_{i=1}^{N} x_i
+```
+````
+
+GitHub supports both `$$...$$` and fenced `math` syntax, but fenced `math` blocks are less ambiguous for multiline equations inside `.md` files and are therefore the repository convention.
+
+Prefer simple MathJax macros that GitHub renders reliably. Avoid macros known to be rejected by GitHub's renderer, such as `\operatorname`; use simpler forms such as `\mathrm{ReLU}` instead.
 
 Important equations should be readable, not only correct. Define non-trivial notation near first use and follow important equations with a plain-language interpretation.
 
@@ -38,7 +50,7 @@ Run:
 python scripts/check_markdown_math.py
 ```
 
-to validate canonical delimiters locally. CI runs the same check.
+to validate the repository math conventions locally. CI runs the same check.
 
 ## Visual explanations
 
