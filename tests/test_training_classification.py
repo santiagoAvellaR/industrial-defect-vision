@@ -2,7 +2,11 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from industrial_vision.training.classification import evaluate, train_one_epoch
+from industrial_vision.training.classification import (
+    classification_metrics,
+    evaluate,
+    train_one_epoch,
+)
 
 
 class TinyClassifier(nn.Module):
@@ -51,3 +55,15 @@ def test_evaluate_reports_binary_metrics_without_updating_parameters() -> None:
     assert metrics["tn"] == 1
     assert metrics["fp"] == 1
     assert metrics["fn"] == 1
+
+
+def test_lower_threshold_increases_recall_for_fixed_probabilities() -> None:
+    probabilities = torch.tensor([0.9, 0.6, 0.4, 0.2])
+    labels = torch.tensor([1, 0, 1, 0])
+
+    default_metrics = classification_metrics(probabilities, labels, threshold=0.5)
+    lower_metrics = classification_metrics(probabilities, labels, threshold=0.3)
+
+    assert default_metrics["recall"] == 0.5
+    assert lower_metrics["recall"] == 1.0
+    assert lower_metrics["fp"] > default_metrics["fp"]
