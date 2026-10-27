@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gradient descent — one parameter</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 32px auto; padding: 0 20px; line-height: 1.5; }
+    canvas { width: 100%; border: 1px solid #aaa; border-radius: 8px; }
+    .controls { display: grid; gap: 12px; margin: 20px 0; }
+    .values { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .card { border: 1px solid #bbb; border-radius: 8px; padding: 12px; }
+    code { font-size: 1rem; }
+    button { width: fit-content; padding: 8px 14px; }
+  </style>
+</head>
+<body>
+  <h1>Gradient descent with one parameter</h1>
+  <p>We use <code>L(w) = (w - 3)²</code>. Move <code>w</code> and observe the local gradient. The minimum is at <code>w = 3</code>.</p>
+
+  <canvas id="chart" width="850" height="430"></canvas>
+
+  <div class="controls">
+    <label>
+      Current weight <code>w</code>:
+      <input id="weight" type="range" min="-1" max="7" step="0.1" value="1" />
+      <strong id="weightValue">1.0</strong>
+    </label>
+    <label>
+      Learning rate <code>η</code>:
+      <input id="lr" type="range" min="0.01" max="0.4" step="0.01" value="0.1" />
+      <strong id="lrValue">0.10</strong>
+    </label>
+    <button id="step">Apply one gradient-descent step</button>
+  </div>
+
+  <div class="values">
+    <div class="card"><strong>Loss</strong><br><code id="loss"></code></div>
+    <div class="card"><strong>Gradient dL/dw</strong><br><code id="gradient"></code></div>
+    <div class="card"><strong>Direction to reduce loss</strong><br><span id="direction"></span></div>
+    <div class="card"><strong>Next w</strong><br><code id="nextWeight"></code></div>
+  </div>
+
+  <p><strong>Mental model:</strong> the gradient points toward increasing loss. Gradient descent subtracts it, so the parameter moves in the opposite direction.</p>
+
+<script>
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const weightInput = document.getElementById('weight');
+const lrInput = document.getElementById('lr');
+
+function loss(w) { return (w - 3) ** 2; }
+function gradient(w) { return 2 * (w - 3); }
+
+function xToPx(w) {
+  return 55 + ((w + 1) / 8) * (canvas.width - 90);
+}
+function yToPx(value) {
+  const maxLoss = 16;
+  return canvas.height - 45 - (value / maxLoss) * (canvas.height - 85);
+}
+
+function draw() {
+  const w = Number(weightInput.value);
+  const eta = Number(lrInput.value);
+  const l = loss(w);
+  const g = gradient(w);
+  const next = w - eta * g;
+
+  document.getElementById('weightValue').textContent = w.toFixed(1);
+  document.getElementById('lrValue').textContent = eta.toFixed(2);
+  document.getElementById('loss').textContent = `L = ${l.toFixed(3)}`;
+  document.getElementById('gradient').textContent = g.toFixed(3);
+  document.getElementById('nextWeight').textContent = `${w.toFixed(2)} - ${eta.toFixed(2)} × (${g.toFixed(2)}) = ${next.toFixed(3)}`;
+  document.getElementById('direction').textContent = g < 0 ? 'increase w →' : g > 0 ? '← decrease w' : 'already at the minimum';
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#888';
+  ctx.beginPath();
+  ctx.moveTo(55, 20);
+  ctx.lineTo(55, canvas.height - 45);
+  ctx.lineTo(canvas.width - 25, canvas.height - 45);
+  ctx.stroke();
+
+  ctx.fillStyle = '#444';
+  ctx.font = '14px system-ui';
+  ctx.fillText('Loss L(w)', 10, 25);
+  ctx.fillText('w', canvas.width - 30, canvas.height - 20);
+  ctx.fillText('3', xToPx(3) - 4, canvas.height - 24);
+
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#333';
+  ctx.beginPath();
+  for (let i = 0; i <= 300; i++) {
+    const x = -1 + (8 * i / 300);
+    const px = xToPx(x);
+    const py = yToPx(Math.min(loss(x), 16));
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#777';
+  ctx.beginPath();
+  ctx.arc(xToPx(3), yToPx(0), 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillText('minimum', xToPx(3) + 8, yToPx(0) - 8);
+
+  const px = xToPx(w);
+  const py = yToPx(Math.min(l, 16));
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(px, py, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  const nextPx = xToPx(next);
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(px, py - 18);
+  ctx.lineTo(nextPx, py - 18);
+  ctx.stroke();
+  const sign = Math.sign(nextPx - px);
+  if (sign !== 0) {
+    ctx.beginPath();
+    ctx.moveTo(nextPx, py - 18);
+    ctx.lineTo(nextPx - sign * 10, py - 24);
+    ctx.lineTo(nextPx - sign * 10, py - 12);
+    ctx.closePath();
+    ctx.fillStyle = '#555';
+    ctx.fill();
+  }
+}
+
+weightInput.addEventListener('input', draw);
+lrInput.addEventListener('input', draw);
+document.getElementById('step').addEventListener('click', () => {
+  const w = Number(weightInput.value);
+  const eta = Number(lrInput.value);
+  const next = w - eta * gradient(w);
+  weightInput.value = Math.max(-1, Math.min(7, next));
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>
