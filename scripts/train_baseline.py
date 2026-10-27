@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--pos-weight", type=float, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--checkpoint",
@@ -60,7 +61,15 @@ def main() -> None:
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
     model = BaselineCNN().to(device)
-    criterion = nn.BCEWithLogitsLoss()
+
+    if args.pos_weight is None:
+        criterion = nn.BCEWithLogitsLoss()
+        print("pos_weight: none")
+    else:
+        pos_weight = torch.tensor([args.pos_weight], device=device)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        print(f"pos_weight: {args.pos_weight}")
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     best_val_loss = float("inf")
@@ -83,6 +92,7 @@ def main() -> None:
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_loss": best_val_loss,
                     "val_metrics": val_metrics,
+                    "pos_weight": args.pos_weight,
                     "seed": args.seed,
                 },
                 args.checkpoint,
