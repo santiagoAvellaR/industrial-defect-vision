@@ -37,6 +37,7 @@ Defaults:
 - epochs: `10`;
 - batch size: `32`;
 - learning rate: `1e-3`;
+- positive-class weight: none;
 - seed: `42`;
 - best checkpoint: `artifacts/checkpoints/baseline_cnn.pt`.
 
@@ -50,3 +51,13 @@ python scripts/train_baseline.py data/raw/ksdd2 \
   --batch-size 32 \
   --learning-rate 1e-3
 ```
+
+To run the first positive-class-weighted experiment while leaving the rest of the setup unchanged:
+
+```bash
+python scripts/train_baseline.py data/raw/ksdd2 \
+  --pos-weight 8.47 \
+  --checkpoint artifacts/checkpoints/baseline_cnn_pos_weight.pt
+```
+
+The separate checkpoint path avoids overwriting the unweighted EXP-001 checkpoint.
