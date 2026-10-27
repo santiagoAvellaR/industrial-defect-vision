@@ -61,3 +61,24 @@ python scripts/train_baseline.py data/raw/ksdd2 \
 ```
 
 The separate checkpoint path avoids overwriting the unweighted EXP-001 checkpoint.
+
+## Validation threshold sweep
+
+A trained checkpoint can be evaluated at different classification thresholds without retraining:
+
+```bash
+python scripts/evaluate_thresholds.py \
+  data/raw/ksdd2 \
+  artifacts/checkpoints/baseline_cnn_pos_weight_20e.pt
+```
+
+The script:
+
+- loads the saved model;
+- computes validation probabilities once;
+- evaluates thresholds from `0.10` to `0.90` in steps of `0.05`;
+- reports precision, recall, F1, TP, FP and FN for each threshold;
+- prints the threshold with the highest validation F1;
+- saves `artifacts/figures/threshold_sweep.png`.
+
+Threshold selection is performed on validation data. The untouched test split must not be used to choose the threshold.
