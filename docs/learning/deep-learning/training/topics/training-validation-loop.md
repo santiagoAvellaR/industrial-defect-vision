@@ -123,7 +123,24 @@ F_1
 
 ## Best checkpoint
 
-The first baseline saves the checkpoint with the lowest validation loss.
+The baseline saves the checkpoint with the lowest validation loss.
+
+The model parameters themselves are updated after training batches and remain in memory throughout the run. That is separate from writing a checkpoint file to disk.
+
+The `.pt` file is **not written at every epoch**. After each validation epoch, the script checks:
+
+```python
+if val_metrics["loss"] < best_val_loss:
+```
+
+Only when validation loss improves does it call `torch.save(...)`. Because the same checkpoint path is reused, each new best checkpoint replaces the previous best file.
+
+Therefore:
+
+- model weights continue evolving in memory every training batch;
+- an epoch with no new best validation loss does not create or update the `.pt` file;
+- the final `.pt` contains the parameters from the best validation-loss epoch, not necessarily the last epoch;
+- it is also not necessarily the epoch with the best F1, recall or precision.
 
 The checkpoint contains:
 
@@ -133,10 +150,13 @@ optimizer_state_dict
 epoch
 validation loss
 validation metrics
+pos_weight
 seed
 ```
 
 Using validation loss gives us a continuous criterion that is independent of choosing a classification threshold for model selection. Precision, recall and F1 are still reported because they are essential for interpreting behavior on this imbalanced dataset.
+
+This creates an important distinction: **best according to validation loss is not automatically best according to the operational metric we care about.**
 
 The checkpoint is written to:
 
@@ -168,4 +188,5 @@ Executable training entry point:
 4. Why can accuracy be misleading for KSDD2?
 5. What do precision and recall measure for the defective class?
 6. Why do we save the best model using validation rather than training loss?
-7. Why are we not correcting class imbalance before the first baseline run?
+7. Why is writing a checkpoint different from updating model weights?
+8. Why can the best validation-loss checkpoint differ from the best-F1 epoch?
