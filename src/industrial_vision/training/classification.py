@@ -2,8 +2,11 @@ import torch
 from torch import nn
 
 
-def _classification_counts(logits: torch.Tensor, labels: torch.Tensor) -> tuple[int, int, int, int]:
-    predictions = (logits >= 0).long()
+def _classification_counts(
+    predictions: torch.Tensor,
+    labels: torch.Tensor,
+) -> tuple[int, int, int, int]:
+    predictions = predictions.long()
     targets = labels.long()
 
     tp = int(((predictions == 1) & (targets == 1)).sum().item())
@@ -13,8 +16,7 @@ def _classification_counts(logits: torch.Tensor, labels: torch.Tensor) -> tuple[
     return tp, tn, fp, fn
 
 
-def _epoch_metrics(
-    total_loss: float,
+def _metrics_from_counts(
     total_samples: int,
     tp: int,
     tn: int,
@@ -26,7 +28,6 @@ def _epoch_metrics(
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
     return {
-        "loss": total_loss / total_samples,
         "accuracy": (tp + tn) / total_samples,
         "precision": precision,
         "recall": recall,
@@ -36,6 +37,28 @@ def _epoch_metrics(
         "fp": fp,
         "fn": fn,
     }
+
+
+def classification_metrics(
+    probabilities: torch.Tensor,
+    labels: torch.Tensor,
+    threshold: float = 0.5,
+) -> dict[str, float | int]:
+    predictions = probabilities >= threshold
+    tp, tn, fp, fn = _classification_counts(predictions, labels)
+    return _metrics_from_counts(labels.numel(), tp, tn, fp, fn)
+
+
+def _epoch_metrics(
+    total_loss: float,
+    total_samples: int,
+    tp: int,
+    tn: int,
+    fp: int,
+    fn: int,
+) -> dict[str, float | int]:
+    metrics = _metrics_from_counts(total_samples, tp, tn, fp, fn)
+    return {"loss": total_loss / total_samples, **metrics}
 
 
 def train_one_epoch(
@@ -67,7 +90,8 @@ def train_one_epoch(
         total_loss += loss.item() * batch_size
         total_samples += batch_size
 
-        batch_tp, batch_tn, batch_fp, batch_fn = _classification_counts(logits.detach(), labels)
+        predictions = logits.detach() >= 0
+        batch_tp, batch_tn, batch_fp, batch_fn = _classification_counts(predictions, labels)
         tp += batch_tp
         tn += batch_tn
         fp += batch_fp
@@ -100,7 +124,8 @@ def evaluate(
             total_loss += loss.item() * batch_size
             total_samples += batch_size
 
-            batch_tp, batch_tn, batch_fp, batch_fn = _classification_counts(logits, labels)
+            predictions = logits >= 0
+            batch_tp, batch_tn, batch_fp, batch_fn = _classification_counts(predictions, labels)
             tp += batch_tp
             tn += batch_tn
             fp += batch_fp
