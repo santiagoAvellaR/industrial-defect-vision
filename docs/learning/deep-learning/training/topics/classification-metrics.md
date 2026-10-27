@@ -16,6 +16,15 @@ For this project:
 | FP — false positive | predicted defective, actually clean | false alarm / unnecessary rejection |
 | FN — false negative | predicted clean, actually defective | missed defect |
 
+A useful mental rule is:
+
+> **True/False tells us whether the prediction was correct. Positive/Negative tells us what the model predicted.**
+
+So:
+
+- `FP`: the model predicted **positive / defective**, but that prediction was false;
+- `FN`: the model predicted **negative / clean**, but that prediction was false.
+
 In industrial inspection, false negatives are often particularly important because a defective product may pass inspection.
 
 ## Accuracy
