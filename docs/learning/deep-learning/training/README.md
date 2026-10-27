@@ -10,6 +10,7 @@ These notes cover the part of M2 that turns a forward pass and a scalar loss int
 4. [Training mode vs evaluation mode](topics/train-vs-eval.md) — `model.train()`, `model.eval()`, `torch.no_grad()` and why validation must not update parameters.
 5. [Training and validation loop](topics/training-validation-loop.md) — epoch-level loss, imbalanced classification metrics and best-checkpoint selection.
 6. [Classification metrics](topics/classification-metrics.md) — TP/TN/FP/FN, accuracy, precision, recall and F1 for imbalanced defect detection.
+7. [Class imbalance and positive weighting](topics/class-imbalance-and-pos-weight.md) — why EXP-001 collapsed to the majority class and how `pos_weight` changes BCE training.
 
 ## Training boundary
 
@@ -45,7 +46,7 @@ Executable baseline training script:
 
 `scripts/train_baseline.py`
 
-The first baseline uses unweighted `BCEWithLogitsLoss()` and reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. The best checkpoint is selected by validation loss.
+The script reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. By default it uses unweighted `BCEWithLogitsLoss()`; `--pos-weight` enables an explicitly weighted positive class for controlled imbalance experiments. The best checkpoint is selected by validation loss.
 
 ## Interactive visual
 
