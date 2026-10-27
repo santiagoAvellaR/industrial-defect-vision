@@ -11,6 +11,7 @@ These notes cover the part of M2 that turns a forward pass and a scalar loss int
 5. [Training and validation loop](topics/training-validation-loop.md) — epoch-level loss, imbalanced classification metrics and best-checkpoint selection.
 6. [Classification metrics](topics/classification-metrics.md) — TP/TN/FP/FN, accuracy, precision, recall and F1 for imbalanced defect detection.
 7. [Class imbalance and positive weighting](topics/class-imbalance-and-pos-weight.md) — why EXP-001 collapsed to the majority class and how `pos_weight` changes BCE training.
+8. [Classification threshold](topics/classification-threshold.md) — how a probability becomes a class decision and why threshold choice trades precision against recall.
 
 ## Training boundary
 
@@ -46,7 +47,13 @@ Executable baseline training script:
 
 `scripts/train_baseline.py`
 
-The script reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. By default it uses unweighted `BCEWithLogitsLoss()`; `--pos-weight` enables an explicitly weighted positive class for controlled imbalance experiments. The best checkpoint is selected by validation loss.
+Threshold evaluation script:
+
+`scripts/evaluate_thresholds.py`
+
+The training script reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. By default it uses unweighted `BCEWithLogitsLoss()`; `--pos-weight` enables an explicitly weighted positive class for controlled imbalance experiments. The best checkpoint is selected by validation loss.
+
+The threshold script reuses a trained checkpoint and studies how the validation decision policy changes without retraining the CNN.
 
 ## Interactive visual
 
