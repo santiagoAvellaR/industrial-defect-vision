@@ -8,8 +8,7 @@ These notes cover the part of M2 that turns a forward pass and a scalar loss int
 2. [Batches and epochs](topics/batches-and-epochs.md) — sample, batch, iteration/step and epoch.
 3. [Optimizer and gradient reset](topics/optimizer-and-gradient-reset.md) — gradient accumulation, `optimizer.zero_grad()`, `optimizer.step()`, learning rate and the one-batch training step.
 4. [Training mode vs evaluation mode](topics/train-vs-eval.md) — `model.train()`, `model.eval()`, `torch.no_grad()` and why validation must not update parameters.
-
-The next topic will be added after it is studied and understood: the complete training/validation loop with epoch-level metrics and checkpoint selection.
+5. [Training and validation loop](topics/training-validation-loop.md) — epoch-level loss, imbalanced classification metrics and best-checkpoint selection.
 
 ## Training boundary
 
@@ -32,7 +31,20 @@ The important separation is:
 - backpropagation computes gradients;
 - the optimizer uses gradients to update parameters;
 - gradients are cleared before the next standard training step so batches do not unintentionally accumulate into one another;
-- validation observes the model without updating it.
+- validation observes the model without updating it;
+- epoch metrics summarize behavior over all samples rather than one batch.
+
+## Current M2 implementation
+
+Reusable train/validation epoch logic:
+
+`src/industrial_vision/training/classification.py`
+
+Executable baseline training script:
+
+`scripts/train_baseline.py`
+
+The first baseline uses unweighted `BCEWithLogitsLoss()` and reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. The best checkpoint is selected by validation loss.
 
 ## Interactive visual
 
