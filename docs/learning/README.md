@@ -54,13 +54,15 @@ to validate the repository math conventions locally. CI runs the same check.
 
 ## Visual explanations
 
-When a concept is spatial, graphical, or hard to picture from prose alone, add a visual if it materially improves understanding.
+When a concept is spatial, graphical, geometric or easier to understand visually, prefer a real visualization over an ASCII sketch.
 
 Use the simplest useful medium:
 
-- Mermaid or Markdown diagrams for flows and tensor shapes;
-- matplotlib plots for functions, distributions, metrics and experiment results;
+- Mermaid for architecture, dependency and process flows;
+- matplotlib plots for functions, loss surfaces, distributions, metrics and experiment results;
 - notebook visualizations for real images, masks and overlays;
-- small self-contained HTML/CSS/JavaScript demos when interaction genuinely helps, such as a convolution kernel sliding across an image.
+- small self-contained HTML/CSS/JavaScript demos when motion or interaction materially improves understanding, such as a convolution kernel sliding across an image or gradient descent moving toward a minimum.
+
+ASCII/text diagrams are acceptable only when they are genuinely clearer than a graphic, for example a short tensor-shape progression or directory hierarchy. Do not use ASCII art to represent curves, geometry, spatial mechanisms or other concepts that should be plotted or diagrammed properly.
 
 Visuals should explain a mechanism, relationship or result. Do not add frontend libraries or dependencies only for decoration.
