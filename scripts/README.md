@@ -82,3 +82,24 @@ The script:
 - saves `artifacts/figures/threshold_sweep.png`.
 
 Threshold selection is performed on validation data. The untouched test split must not be used to choose the threshold.
+
+## Classification error analysis
+
+Inspect validation errors from the 20-epoch weighted checkpoint at the current `0.80` operating threshold:
+
+```bash
+python scripts/analyze_classification_errors.py \
+  data/raw/ksdd2 \
+  artifacts/checkpoints/baseline_cnn_pos_weight_20e.pt \
+  --threshold 0.80
+```
+
+The script saves outputs under `artifacts/error_analysis/`:
+
+- `validation_predictions.csv` — one row per validation image with score, prediction, TP/TN/FP/FN type and mask-area ratio;
+- `score_distribution.png` — clean and defective score distributions;
+- `defect_area_tp_vs_fn.png` — defect-size comparison between detected and missed positives;
+- `false_negatives.png` — the most confidently missed defects, with the ground-truth mask contour;
+- `false_positives.png` — the most confident false alarms.
+
+This analysis is performed only on validation data. Its purpose is to diagnose the current baseline before choosing the next model change.
