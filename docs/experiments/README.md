@@ -12,3 +12,4 @@ MLflow will later store machine-readable runs; these documents capture the quest
 4. [EXP-004 — Validation threshold sweep](EXP-004-validation-threshold-sweep.md) — threshold tuning exposes the precision-recall trade-off without retraining; best tested validation F1 occurs at `0.80`.
 5. [EXP-005 — Classification error analysis](EXP-005-classification-error-analysis.md) — missed defects are typically smaller, but size alone does not explain the errors; global aggregation is the next controlled hypothesis.
 6. [EXP-006 — Global max pooling](EXP-006-global-max-pooling.md) — GMP improves the precision-recall trade-off over GAP, especially when comparing operating points at matched recall.
+7. [EXP-007 — Combined global average and max pooling](EXP-007-combined-global-pooling.md) — GAP+GMP improves several matched-recall operating points, but the best tested F1 remains `0.7013`, supporting closure of the scratch-CNN baseline phase.
