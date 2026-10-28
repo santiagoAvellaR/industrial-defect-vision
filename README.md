@@ -23,11 +23,13 @@ The project is intentionally built as an ML engineering system rather than a not
 
 ## Status
 
-**Current milestone: M2 — PyTorch CNN baseline.**
+**Current milestone: M3 — Transfer learning.**
 
 M0 — repository foundation — is complete and validated by GitHub Actions on Python 3.11, 3.12 and 3.13.
 
 M1 — dataset & exploration — is complete. KSDD2 was inspected, split reproducibly, explored visually and statistically, loaded through PyTorch, and checked for exact cross-split duplicate leakage.
+
+M2 — PyTorch CNN baseline — is complete. A scratch CNN was trained end to end, class imbalance and misleading accuracy were diagnosed, weighted BCE was introduced, checkpoints and threshold analysis were implemented, errors were inspected visually and quantitatively, and GAP/GMP aggregation variants were compared under controlled experiments.
 
 ## Planned workflow
 
@@ -55,7 +57,7 @@ Docker
 
 - [x] M0 — Repository foundation
 - [x] M1 — Dataset & exploration
-- [ ] M2 — PyTorch CNN baseline
+- [x] M2 — PyTorch CNN baseline
 - [ ] M3 — Transfer learning
 - [ ] M4 — Semantic segmentation
 - [ ] M5 — Modern pretrained segmentation
