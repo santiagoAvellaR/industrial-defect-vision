@@ -19,3 +19,13 @@ def test_baseline_cnn_supports_global_max_pooling() -> None:
     logits = model(images)
 
     assert logits.shape == (4,)
+
+
+def test_baseline_cnn_supports_combined_global_pooling() -> None:
+    model = BaselineCNN(global_pool="avgmax")
+    images = torch.randn(4, 3, 640, 224)
+
+    logits = model(images)
+
+    assert logits.shape == (4,)
+    assert model.classifier.in_features == 128
