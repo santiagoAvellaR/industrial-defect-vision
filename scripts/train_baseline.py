@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--pos-weight", type=float, default=None)
+    parser.add_argument("--global-pool", choices=("avg", "max"), default="avg")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--checkpoint",
@@ -47,6 +48,7 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device: {device}")
+    print(f"global_pool: {args.global_pool}")
 
     train_dataset = KSDD2Dataset(args.dataset_root, args.train_manifest)
     val_dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
@@ -60,7 +62,7 @@ def main() -> None:
     )
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-    model = BaselineCNN().to(device)
+    model = BaselineCNN(global_pool=args.global_pool).to(device)
 
     if args.pos_weight is None:
         criterion = nn.BCEWithLogitsLoss()
@@ -93,6 +95,7 @@ def main() -> None:
                     "val_loss": best_val_loss,
                     "val_metrics": val_metrics,
                     "pos_weight": args.pos_weight,
+                    "global_pool": args.global_pool,
                     "seed": args.seed,
                 },
                 args.checkpoint,
