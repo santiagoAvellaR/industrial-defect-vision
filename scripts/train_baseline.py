@@ -19,7 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--pos-weight", type=float, default=None)
-    parser.add_argument("--global-pool", choices=("avg", "max"), default="avg")
+    parser.add_argument("--global-pool", choices=("avg", "max", "avgmax"), default="avg")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--checkpoint",
