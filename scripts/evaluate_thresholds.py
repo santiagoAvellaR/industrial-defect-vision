@@ -35,8 +35,9 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(args.checkpoint, map_location=device)
+    global_pool = checkpoint.get("global_pool", "avg")
 
-    model = BaselineCNN().to(device)
+    model = BaselineCNN(global_pool=global_pool).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
@@ -60,6 +61,7 @@ def main() -> None:
 
     print(f"checkpoint epoch: {checkpoint['epoch']}")
     print(f"checkpoint val_loss: {checkpoint['val_loss']:.4f}")
+    print(f"global_pool: {global_pool}")
     print()
     print("threshold precision recall   f1       tp   fp   fn")
     print("--------- --------- -------- -------- ---- ---- ----")
