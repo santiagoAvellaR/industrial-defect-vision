@@ -11,3 +11,4 @@ MLflow will later store machine-readable runs; these documents capture the quest
 3. [EXP-003 — Positive-class weighting for 20 epochs](EXP-003-pos-weight-20-epochs.md) — longer training lowers validation loss but reveals a mismatch between best-loss and best-F1 epochs.
 4. [EXP-004 — Validation threshold sweep](EXP-004-validation-threshold-sweep.md) — threshold tuning exposes the precision-recall trade-off without retraining; best tested validation F1 occurs at `0.80`.
 5. [EXP-005 — Classification error analysis](EXP-005-classification-error-analysis.md) — missed defects are typically smaller, but size alone does not explain the errors; global aggregation is the next controlled hypothesis.
+6. [EXP-006 — Global max pooling](EXP-006-global-max-pooling.md) — GMP improves the precision-recall trade-off over GAP, especially when comparing operating points at matched recall.
