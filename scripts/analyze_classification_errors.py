@@ -67,7 +67,8 @@ def save_defect_area_comparison(records: list[dict], path: Path) -> None:
     fn_areas = [row["mask_area_ratio"] * 100 for row in records if row["error"] == "fn"]
 
     figure, axis = plt.subplots()
-    axis.boxplot([tp_areas, fn_areas], tick_labels=["TP", "FN"])
+    axis.boxplot([tp_areas, fn_areas])
+    axis.set_xticks([1, 2], labels=["TP", "FN"])
     axis.set_ylabel("Defect area (% of image)")
     figure.tight_layout()
     figure.savefig(path)
