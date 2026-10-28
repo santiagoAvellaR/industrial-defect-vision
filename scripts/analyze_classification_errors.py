@@ -67,8 +67,7 @@ def save_defect_area_comparison(records: list[dict], path: Path) -> None:
     fn_areas = [row["mask_area_ratio"] * 100 for row in records if row["error"] == "fn"]
 
     figure, axis = plt.subplots()
-    axis.boxplot([tp_areas, fn_areas])
-    axis.set_xticks([1, 2], labels=["TP", "FN"])
+    axis.boxplot([tp_areas, fn_areas], labels=["TP", "FN"])
     axis.set_ylabel("Defect area (% of image)")
     figure.tight_layout()
     figure.savefig(path)
@@ -125,7 +124,8 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    model = BaselineCNN().to(device)
+    global_pool = checkpoint.get("global_pool", "avg")
+    model = BaselineCNN(global_pool=global_pool).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
@@ -191,6 +191,7 @@ def main() -> None:
     fn_areas = [row["mask_area_ratio"] for row in records if row["error"] == "fn"]
 
     print(f"checkpoint epoch: {checkpoint['epoch']}")
+    print(f"global_pool: {global_pool}")
     print(f"threshold: {args.threshold:.2f}")
     print(
         f"tp={metrics['tp']} tn={metrics['tn']} "
