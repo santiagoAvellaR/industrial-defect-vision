@@ -58,7 +58,7 @@ def test_evaluate_reports_binary_metrics_without_updating_parameters() -> None:
 
 
 def test_lower_threshold_increases_recall_for_fixed_probabilities() -> None:
-    probabilities = torch.tensor([0.9, 0.6, 0.4, 0.2])
+    probabilities = torch.tensor([0.9, 0.2, 0.4, 0.4])
     labels = torch.tensor([1, 0, 1, 0])
 
     default_metrics = classification_metrics(probabilities, labels, threshold=0.5)
