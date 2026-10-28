@@ -38,6 +38,7 @@ Defaults:
 - batch size: `32`;
 - learning rate: `1e-3`;
 - positive-class weight: none;
+- global pooling: average;
 - seed: `42`;
 - best checkpoint: `artifacts/checkpoints/baseline_cnn.pt`.
 
@@ -61,6 +62,18 @@ python scripts/train_baseline.py data/raw/ksdd2 \
 ```
 
 The separate checkpoint path avoids overwriting the unweighted EXP-001 checkpoint.
+
+To compare global max pooling against the 20-epoch weighted average-pooling baseline:
+
+```bash
+python scripts/train_baseline.py data/raw/ksdd2 \
+  --epochs 20 \
+  --pos-weight 8.47 \
+  --global-pool max \
+  --checkpoint artifacts/checkpoints/baseline_cnn_global_max_20e.pt
+```
+
+This controlled experiment changes only the final global aggregation from average to maximum. The checkpoint stores the pooling mode so evaluation scripts can reconstruct the correct model. Older checkpoints without this field are interpreted as average-pooling checkpoints.
 
 ## Validation threshold sweep
 
