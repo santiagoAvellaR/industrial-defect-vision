@@ -17,3 +17,4 @@ MLflow will later store machine-readable runs; these documents capture the quest
 ## M3 transfer-learning experiments
 
 8. [EXP-008 — Frozen pretrained ResNet18](EXP-008-frozen-resnet18.md) — pretrained features alone are useful but underperform the scratch CNN; the result motivates partial fine-tuning to adapt to the industrial domain.
+9. [EXP-009 — ResNet18 partial fine-tuning](EXP-009-resnet18-layer4-finetuning.md) — fine-tuning `layer4` strongly improves class separation, reaching validation `F1=0.8090` and reducing false positives from `26` to `4` versus the scratch CNN at matched recall `0.7347`.
