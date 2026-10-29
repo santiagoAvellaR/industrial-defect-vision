@@ -7,6 +7,7 @@ This section records the concepts used in M4, where the project moves from image
 1. [Encoder, decoder, bottleneck and U-Net skip connections](topics/encoder-decoder-and-unet.md)
 2. [Pixel logits](topics/pixel-logits.md) — how the network produces one learned defect logit at every spatial position.
 3. [Upsampling](topics/upsampling.md) — how a decoder increases spatial resolution and why enlargement alone does not restore lost detail.
+4. [Pixel imbalance, IoU and Dice](topics/pixel-imbalance-iou-and-dice.md) — why pixel accuracy is misleading and how overlap metrics evaluate defect masks.
 
 For a cross-project visual summary of every architecture studied so far, see the [architecture atlas](../architectures/README.md).
 
@@ -42,4 +43,6 @@ By the end of M4, we should be able to answer:
 - How are U-Net skip connections different from ResNet residual connections?
 - How does the final layer produce one logit per pixel?
 - What shape should a binary segmentation model output?
+- Why can pixel accuracy be misleading for small defects?
+- What do IoU and Dice measure?
 - How do pixel-level losses and metrics differ from image-level classification metrics?
