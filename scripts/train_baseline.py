@@ -90,12 +90,14 @@ def main() -> None:
             torch.save(
                 {
                     "epoch": epoch,
+                    "model_name": "baseline_cnn",
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_loss": best_val_loss,
                     "val_metrics": val_metrics,
                     "pos_weight": args.pos_weight,
                     "global_pool": args.global_pool,
+                    "imagenet_normalize": False,
                     "seed": args.seed,
                 },
                 args.checkpoint,
