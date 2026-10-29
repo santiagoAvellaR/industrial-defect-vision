@@ -5,7 +5,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-from industrial_vision.data.dataset import KSDD2Dataset
+from industrial_vision.data.dataset import IMAGENET_MEAN, IMAGENET_STD, KSDD2Dataset
 
 
 def _save_sample(root: Path, name: str, defective: bool) -> tuple[str, str, int]:
@@ -47,6 +47,23 @@ def test_dataset_loads_image_mask_and_label(tmp_path: Path) -> None:
     assert mask.dtype == torch.float32
     assert set(mask.unique().tolist()) <= {0.0, 1.0}
     assert label == 1
+
+
+def test_dataset_can_use_imagenet_normalization(tmp_path: Path) -> None:
+    row = _save_sample(tmp_path, "10000", defective=False)
+    manifest = tmp_path / "train.csv"
+    _write_manifest(manifest, [row])
+
+    dataset = KSDD2Dataset(
+        tmp_path,
+        manifest,
+        image_size=(8, 4),
+        imagenet_normalize=True,
+    )
+    image, _, _ = dataset[0]
+
+    expected_red = ((20 / 255) - IMAGENET_MEAN[0]) / IMAGENET_STD[0]
+    assert torch.isclose(image[0, 0, 0], torch.tensor(expected_red))
 
 
 def test_dataset_can_be_batched(tmp_path: Path) -> None:
