@@ -139,7 +139,7 @@ needs careful adjustment
 → smaller learning rate can be reasonable
 ```
 
-Later we can implement different optimizer parameter groups if the experiments justify it.
+PyTorch optimizer parameter groups let these two parts use different learning rates without needing separate optimizers.
 
 ## Catastrophic forgetting
 
@@ -174,7 +174,34 @@ Therefore a robust freeze/fine-tune implementation must be explicit about both:
 - which parameters are trainable;
 - whether the model or selected modules are in training or evaluation mode.
 
-We will handle this deliberately when implementing the pretrained backbone rather than hiding it behind a helper abstraction.
+For partial ResNet18 fine-tuning in this project, earlier residual stages stay in evaluation mode while `layer4` enters training mode. This means the earlier BatchNorm state remains fixed, while the deepest stage is allowed to adapt its trainable parameters and running statistics.
+
+## Project evidence from EXP-008
+
+The frozen ResNet18 experiment produced meaningful classification but did not beat the scratch CNN:
+
+- frozen ResNet18 best tested validation F1: `0.6200`;
+- scratch GAP+GMP best tested validation F1: `0.7013`.
+
+At a similar recall near `0.63`, the scratch model also retained higher precision.
+
+This is the evidence that justifies fine-tuning. The pretrained representation is useful enough to classify above chance, but not sufficiently aligned with KSDD2 when completely fixed.
+
+## EXP-009 fine-tuning plan
+
+The first adaptation step is deliberately partial:
+
+- start from the trained frozen ResNet18 checkpoint;
+- keep `conv1`, `layer1`, `layer2`, and `layer3` frozen;
+- make `layer4` trainable;
+- keep the binary classifier trainable;
+- classifier learning rate: `1e-3`;
+- `layer4` learning rate: `1e-4`;
+- keep the same splits, `pos_weight=8.47`, metrics and threshold analysis.
+
+The frozen checkpoint supplies the model weights, but a new optimizer is created because the set of trainable parameters has changed.
+
+The question is not simply whether training loss decreases. The key question is whether adapting `layer4` improves the validation precision-recall trade-off compared with both frozen ResNet18 and the scratch CNN.
 
 ## How we will evaluate fine-tuning
 
