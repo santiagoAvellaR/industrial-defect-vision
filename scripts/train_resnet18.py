@@ -12,7 +12,7 @@ from industrial_vision.training.classification import evaluate, train_one_epoch
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Train a pretrained ResNet18 classifier with a frozen backbone."
+        description="Train or fine-tune a pretrained ResNet18 classifier."
     )
     parser.add_argument("dataset_root", type=Path)
     parser.add_argument("--train-manifest", type=Path, default=Path("data/splits/train.csv"))
@@ -20,7 +20,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--backbone-learning-rate", type=float, default=1e-4)
     parser.add_argument("--pos-weight", type=float, default=None)
+    parser.add_argument(
+        "--trainable-backbone",
+        choices=("none", "layer4", "all"),
+        default="none",
+    )
+    parser.add_argument("--initial-checkpoint", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--checkpoint",
@@ -50,7 +57,7 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device: {device}")
     print("model: resnet18 pretrained")
-    print("backbone: frozen")
+    print(f"trainable backbone: {args.trainable_backbone}")
     print("imagenet normalization: enabled")
 
     train_dataset = KSDD2Dataset(
@@ -73,7 +80,19 @@ def main() -> None:
     )
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
-    model = ResNet18Classifier(freeze_backbone=True).to(device)
+    if args.initial_checkpoint is None:
+        model = ResNet18Classifier(
+            trainable_backbone=args.trainable_backbone
+        ).to(device)
+    else:
+        model = ResNet18Classifier(
+            weights=None,
+            trainable_backbone=args.trainable_backbone,
+        ).to(device)
+        initial_checkpoint = torch.load(args.initial_checkpoint, map_location=device)
+        model.load_state_dict(initial_checkpoint["model_state_dict"])
+        print(f"initial checkpoint: {args.initial_checkpoint}")
+
     trainable_parameters = sum(
         parameter.numel() for parameter in model.parameters() if parameter.requires_grad
     )
@@ -87,7 +106,32 @@ def main() -> None:
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         print(f"pos_weight: {args.pos_weight}")
 
-    optimizer = torch.optim.Adam(model.classifier.parameters(), lr=args.learning_rate)
+    parameter_groups = [
+        {
+            "params": model.classifier.parameters(),
+            "lr": args.learning_rate,
+        }
+    ]
+
+    if args.trainable_backbone == "layer4":
+        parameter_groups.append(
+            {
+                "params": model.backbone.layer4.parameters(),
+                "lr": args.backbone_learning_rate,
+            }
+        )
+    elif args.trainable_backbone == "all":
+        parameter_groups.append(
+            {
+                "params": model.backbone.parameters(),
+                "lr": args.backbone_learning_rate,
+            }
+        )
+
+    optimizer = torch.optim.Adam(parameter_groups)
+    print(f"classifier learning rate: {args.learning_rate}")
+    if args.trainable_backbone != "none":
+        print(f"backbone learning rate: {args.backbone_learning_rate}")
 
     best_val_loss = float("inf")
     args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
@@ -111,8 +155,16 @@ def main() -> None:
                     "val_loss": best_val_loss,
                     "val_metrics": val_metrics,
                     "pos_weight": args.pos_weight,
-                    "freeze_backbone": True,
+                    "trainable_backbone": args.trainable_backbone,
+                    "freeze_backbone": args.trainable_backbone == "none",
                     "imagenet_normalize": True,
+                    "classifier_learning_rate": args.learning_rate,
+                    "backbone_learning_rate": args.backbone_learning_rate,
+                    "initial_checkpoint": (
+                        str(args.initial_checkpoint)
+                        if args.initial_checkpoint is not None
+                        else None
+                    ),
                     "seed": args.seed,
                 },
                 args.checkpoint,
