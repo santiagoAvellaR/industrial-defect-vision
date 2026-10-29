@@ -9,6 +9,7 @@ This section records the concepts used in M4, where the project moves from image
 3. [Upsampling](topics/upsampling.md) — how a decoder increases spatial resolution and why enlargement alone does not restore lost detail.
 4. [Pixel imbalance, IoU and Dice](topics/pixel-imbalance-iou-and-dice.md) — why pixel accuracy is misleading and how overlap metrics evaluate defect masks.
 5. [Simple U-Net forward pass](topics/simple-unet-forward-pass.md) — the first implemented M4 model, followed tensor by tensor through encoder, bottleneck, decoder and skips.
+6. [Segmentation losses](topics/segmentation-losses.md) — plain BCE, weighted BCE, soft Dice loss and why the first baseline uses BCE + Dice.
 
 For a cross-project visual summary of every architecture studied so far, see the [architecture atlas](../architectures/README.md).
 
@@ -32,7 +33,15 @@ The first implemented M4 model is `SimpleUNet` in:
 
 `src/industrial_vision/models/simple_unet.py`
 
-It deliberately uses a small scratch encoder-decoder so the complete segmentation forward pass can be understood before moving to a modern pretrained segmentation model in M5.
+Its first training baseline uses `BCEWithLogitsLoss + soft Dice loss`, implemented in:
+
+`src/industrial_vision/training/segmentation.py`
+
+and trained by:
+
+`scripts/train_simple_unet.py`
+
+It deliberately uses a small scratch encoder-decoder so the complete segmentation pipeline can be understood before moving to a modern pretrained segmentation model in M5.
 
 ## M4 questions
 
@@ -50,5 +59,7 @@ By the end of M4, we should be able to answer:
 - What shape should a binary segmentation model output?
 - Why can pixel accuracy be misleading for small defects?
 - What do IoU and Dice measure?
+- Why can plain BCE be dominated by background pixels?
+- Why does the first segmentation baseline combine BCE and Dice loss?
 - How do pixel-level losses and metrics differ from image-level classification metrics?
 - Can we follow the implemented U-Net shapes through every encoder and decoder stage?
