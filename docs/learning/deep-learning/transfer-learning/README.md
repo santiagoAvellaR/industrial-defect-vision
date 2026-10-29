@@ -39,13 +39,38 @@ By the end of M3, we should be able to answer:
 - How does a residual block differ from a plain stack of convolutions?
 - How should transfer learning be compared fairly against the scratch baseline?
 
-## Project plan
+## Controlled comparison completed
 
-The controlled comparison is:
+M3 compared three regimes on the same train/validation split and with the same classification metrics:
 
-1. scratch CNN baseline from M2;
-2. pretrained backbone with the backbone frozen and a new binary classifier trained;
-3. pretrained backbone with selected or all backbone parameters unfrozen for fine-tuning;
-4. comparison using the same train/validation split and the same classification metrics.
+1. scratch CNN from M2;
+2. pretrained ResNet18 with a frozen backbone;
+3. pretrained ResNet18 with partial fine-tuning of `layer4`.
 
-The purpose is not to use a large architecture because it is fashionable. The purpose is to test whether pretrained visual representations improve separation between clean and defective samples, especially the difficult localized defects found during M2 error analysis.
+The frozen backbone did not outperform the scratch CNN, which showed that ImageNet features were not sufficiently aligned with the industrial domain when used unchanged.
+
+Partial fine-tuning changed that result substantially. At matched validation recall `0.7347`:
+
+| Model | Precision | TP | FP | FN |
+|---|---:|---:|---:|---:|
+| Frozen ResNet18 | 0.2416 | 36 | 113 | 13 |
+| Scratch CNN, GAP+GMP | 0.5806 | 36 | 26 | 13 |
+| **ResNet18 with `layer4` fine-tuned** | **0.9000** | **36** | **4** | **13** |
+
+The best tested validation F1 of the fine-tuned model was `0.8090`.
+
+## Main M3 lesson
+
+The important result is not simply that a larger network performed better.
+
+The sequence of experiments showed:
+
+- pretrained features can transfer useful visual information;
+- source-domain features may be poorly aligned with a specialized industrial domain;
+- freezing is a clean way to measure transferability before adaptation;
+- partial fine-tuning can adapt deeper representations while preserving earlier generic features;
+- fine-tuning also increases overfitting risk, so validation checkpoints remain essential.
+
+In EXP-009, training approached perfect fit while validation loss worsened after the best checkpoint. This is why M3 stops at partial fine-tuning rather than automatically unfreezing more layers.
+
+The next milestone moves from image-level classification to semantic segmentation, using the defect masks to learn where defects are located.
