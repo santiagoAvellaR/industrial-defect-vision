@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from industrial_vision.data.dataset import KSDD2Dataset
-from industrial_vision.models.baseline_cnn import BaselineCNN
+from industrial_vision.models.loading import build_model_from_checkpoint
 from industrial_vision.training.classification import classification_metrics
 
 
@@ -35,13 +35,15 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    global_pool = checkpoint.get("global_pool", "avg")
-
-    model = BaselineCNN(global_pool=global_pool).to(device)
+    model = build_model_from_checkpoint(checkpoint).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
-    dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
+    dataset = KSDD2Dataset(
+        args.dataset_root,
+        args.val_manifest,
+        imagenet_normalize=checkpoint.get("imagenet_normalize", False),
+    )
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
     probabilities = []
@@ -59,9 +61,12 @@ def main() -> None:
     thresholds = torch.linspace(0.10, 0.90, 17).tolist()
     rows = []
 
+    model_name = checkpoint.get("model_name", "baseline_cnn")
     print(f"checkpoint epoch: {checkpoint['epoch']}")
     print(f"checkpoint val_loss: {checkpoint['val_loss']:.4f}")
-    print(f"global_pool: {global_pool}")
+    print(f"model: {model_name}")
+    if model_name == "baseline_cnn":
+        print(f"global_pool: {checkpoint.get('global_pool', 'avg')}")
     print()
     print("threshold precision recall   f1       tp   fp   fn")
     print("--------- --------- -------- -------- ---- ---- ----")
