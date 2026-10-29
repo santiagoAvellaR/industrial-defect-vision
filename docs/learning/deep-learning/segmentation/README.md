@@ -8,6 +8,7 @@ This section records the concepts used in M4, where the project moves from image
 2. [Pixel logits](topics/pixel-logits.md) — how the network produces one learned defect logit at every spatial position.
 3. [Upsampling](topics/upsampling.md) — how a decoder increases spatial resolution and why enlargement alone does not restore lost detail.
 4. [Pixel imbalance, IoU and Dice](topics/pixel-imbalance-iou-and-dice.md) — why pixel accuracy is misleading and how overlap metrics evaluate defect masks.
+5. [Simple U-Net forward pass](topics/simple-unet-forward-pass.md) — the first implemented M4 model, followed tensor by tensor through encoder, bottleneck, decoder and skips.
 
 For a cross-project visual summary of every architecture studied so far, see the [architecture atlas](../architectures/README.md).
 
@@ -27,7 +28,11 @@ flowchart LR
     F --> G[Binary defect mask]
 ```
 
-M4 focuses first on understanding and implementing a simple encoder-decoder segmentation model before moving to a modern pretrained segmentation model in M5.
+The first implemented M4 model is `SimpleUNet` in:
+
+`src/industrial_vision/models/simple_unet.py`
+
+It deliberately uses a small scratch encoder-decoder so the complete segmentation forward pass can be understood before moving to a modern pretrained segmentation model in M5.
 
 ## M4 questions
 
@@ -46,3 +51,4 @@ By the end of M4, we should be able to answer:
 - Why can pixel accuracy be misleading for small defects?
 - What do IoU and Dice measure?
 - How do pixel-level losses and metrics differ from image-level classification metrics?
+- Can we follow the implemented U-Net shapes through every encoder and decoder stage?
