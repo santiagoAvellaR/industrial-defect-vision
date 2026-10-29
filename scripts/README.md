@@ -75,7 +75,9 @@ python scripts/train_baseline.py data/raw/ksdd2 \
 
 This controlled experiment changes only the final global aggregation from average to maximum. The checkpoint stores the pooling mode so evaluation scripts can reconstruct the correct model. Older checkpoints without this field are interpreted as average-pooling checkpoints.
 
-## M3 frozen ResNet18 transfer learning
+## M3 ResNet18 transfer learning
+
+### Frozen feature extractor
 
 Train a pretrained ResNet18 while keeping the backbone frozen:
 
@@ -91,6 +93,27 @@ The script keeps the existing `640 x 224` image resize, adds ImageNet normalizat
 The pretrained weights are downloaded automatically by torchvision the first time they are needed if they are not already cached locally.
 
 For the frozen experiment, the ResNet backbone remains in evaluation mode during classifier training so BatchNorm running statistics stay fixed together with the frozen feature extractor.
+
+### Partial fine-tuning
+
+Continue from the frozen checkpoint while allowing only ResNet18 `layer4` and the classifier to adapt:
+
+```bash
+python scripts/train_resnet18.py data/raw/ksdd2 \
+  --epochs 10 \
+  --pos-weight 8.47 \
+  --trainable-backbone layer4 \
+  --initial-checkpoint artifacts/checkpoints/resnet18_frozen.pt \
+  --learning-rate 1e-3 \
+  --backbone-learning-rate 1e-4 \
+  --checkpoint artifacts/checkpoints/resnet18_layer4_finetuned.pt
+```
+
+The classifier receives the larger learning rate because it was created for the target task. The pretrained `layer4` receives the smaller learning rate so its representation is adjusted more conservatively.
+
+Earlier residual stages remain frozen and in evaluation mode. `layer4` runs in training mode, so its trainable parameters and BatchNorm state can adapt to the industrial domain.
+
+The optimizer is created fresh for fine-tuning. The initial checkpoint supplies the model weights, but the previous frozen-classifier optimizer state is not reused because the trainable parameter set has changed.
 
 ## Validation threshold sweep
 
