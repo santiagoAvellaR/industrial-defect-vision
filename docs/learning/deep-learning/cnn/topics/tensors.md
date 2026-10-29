@@ -34,6 +34,46 @@ H = height
 W = width
 ```
 
+## PyTorch is not based on pandas
+
+PyTorch and pandas solve different kinds of problems.
+
+`pandas` is mainly designed for labeled tabular data such as rows and columns in a `DataFrame`.
+
+PyTorch is built around multidimensional `Tensor` objects and numerical kernels designed for large array operations, automatic differentiation and accelerator hardware such as GPUs.
+
+A useful comparison is:
+
+```text
+pandas DataFrame
+→ tables with named rows/columns
+→ data analysis and manipulation
+
+PyTorch Tensor
+→ dense multidimensional numerical arrays
+→ neural-network computation and gradients
+```
+
+PyTorch does not process a convolution by writing a Python loop over every pixel. Operations such as convolution, matrix multiplication, elementwise activations and reductions are implemented by optimized low-level kernels. Those kernels can process many tensor elements efficiently and, depending on the operation and device, in parallel.
+
+For example:
+
+```python
+output = convolution(images)
+```
+
+looks like one Python statement, but underneath it represents a large tensor operation over batches, channels and spatial positions.
+
+On CPU, PyTorch uses optimized native code and can use multiple CPU threads for supported operations. On GPU, the same tensor abstraction lets large numbers of arithmetic operations be executed by GPU kernels in parallel.
+
+The important mental model is:
+
+> We describe an operation on whole tensors. PyTorch chooses efficient low-level implementations rather than asking us to write a Python loop for each scalar.
+
+This is often called **vectorized/tensor computation**.
+
+It does not mean that every scalar operation literally runs at the exact same instant. `Parallel` here means that the backend can exploit hardware parallelism and optimized batched kernels instead of executing a slow Python loop element by element.
+
 ## What is a weight tensor?
 
 A weight tensor is the tensor in which PyTorch stores the learnable parameters of a layer.
@@ -111,3 +151,6 @@ activation tensor
 3. What is the difference between a weight tensor and an activation tensor?
 4. What does `[16, 3, 3, 3]` represent in our first convolution?
 5. Why is one filter `[3,3,3]` for an RGB input?
+6. Why is PyTorch not based on pandas?
+7. What does vectorized/tensor computation mean?
+8. Why can tensor operations be much faster than Python loops over individual pixels?
