@@ -1,13 +1,14 @@
 import csv
 from pathlib import Path
 
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import functional as TF
 from torchvision.transforms.functional import InterpolationMode
 
 DEFAULT_IMAGE_SIZE = (640, 224)
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 class KSDD2Dataset(Dataset):
@@ -16,9 +17,11 @@ class KSDD2Dataset(Dataset):
         dataset_root: Path,
         manifest_path: Path,
         image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE,
+        imagenet_normalize: bool = False,
     ) -> None:
         self.dataset_root = Path(dataset_root)
         self.image_size = image_size
+        self.imagenet_normalize = imagenet_normalize
 
         with Path(manifest_path).open(newline="") as file:
             self.samples = list(csv.DictReader(file))
@@ -39,6 +42,8 @@ class KSDD2Dataset(Dataset):
                 interpolation=InterpolationMode.BILINEAR,
             )
             image = TF.to_tensor(image)
+            if self.imagenet_normalize:
+                image = TF.normalize(image, IMAGENET_MEAN, IMAGENET_STD)
 
         with Image.open(mask_path) as mask:
             mask = mask.convert("L")
