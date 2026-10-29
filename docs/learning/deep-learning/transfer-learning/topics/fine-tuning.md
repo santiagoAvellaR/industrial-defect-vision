@@ -141,6 +141,11 @@ needs careful adjustment
 
 PyTorch optimizer parameter groups let these two parts use different learning rates without needing separate optimizers.
 
+For EXP-009 we used:
+
+- classifier learning rate: `1e-3`;
+- pretrained `layer4` learning rate: `1e-4`.
+
 ## Catastrophic forgetting
 
 If fine-tuning updates the pretrained weights too aggressively, the model can lose useful representations learned during pretraining.
@@ -159,7 +164,19 @@ Fine-tuning becomes especially valuable when frozen source features are useful b
 
 Our domain contains narrow industrial surfaces and small localized defects, which differ strongly from ordinary natural-image classification.
 
-If the frozen model plateaus, fine-tuning gives the feature extractor a chance to become more sensitive to industrial texture and defect patterns.
+EXP-008 provided direct evidence of this domain shift: frozen ResNet18 features underperformed the scratch CNN.
+
+EXP-009 then allowed only `layer4` and the classifier to adapt. At matched validation recall `0.7347`, the comparison was:
+
+| Model | Precision | TP | FP | FN |
+|---|---:|---:|---:|---:|
+| Frozen ResNet18 | 0.2416 | 36 | 113 | 13 |
+| Scratch CNN, GAP+GMP | 0.5806 | 36 | 26 | 13 |
+| **ResNet18 with `layer4` fine-tuned** | **0.9000** | **36** | **4** | **13** |
+
+All three models detect exactly the same number of validation defects in this comparison. The fine-tuned model is better because it achieves that recall with dramatically fewer false alarms.
+
+This is strong project evidence for the purpose of fine-tuning: the source representation was useful as initialization, but its deeper features needed adaptation to separate industrial defects from normal texture.
 
 ## BatchNorm nuance
 
@@ -176,44 +193,44 @@ Therefore a robust freeze/fine-tune implementation must be explicit about both:
 
 For partial ResNet18 fine-tuning in this project, earlier residual stages stay in evaluation mode while `layer4` enters training mode. This means the earlier BatchNorm state remains fixed, while the deepest stage is allowed to adapt its trainable parameters and running statistics.
 
-## Project evidence from EXP-008
+## Overfitting evidence from EXP-009
 
-The frozen ResNet18 experiment produced meaningful classification but did not beat the scratch CNN:
+Fine-tuning also increased the model's capacity to fit our small training set.
 
-- frozen ResNet18 best tested validation F1: `0.6200`;
-- scratch GAP+GMP best tested validation F1: `0.7013`.
+The best validation loss occurred at epoch 5:
 
-At a similar recall near `0.63`, the scratch model also retained higher precision.
+```text
+val_loss = 0.6126
+```
 
-This is the evidence that justifies fine-tuning. The pretrained representation is useful enough to classify above chance, but not sufficiently aligned with KSDD2 when completely fixed.
+After that, training continued improving until train F1 reached `0.9949` at epoch 10, while validation loss worsened to `1.2293`.
 
-## EXP-009 fine-tuning plan
+This is a clear example of overfitting:
 
-The first adaptation step is deliberately partial:
+> better training fit does not guarantee better generalization.
 
-- start from the trained frozen ResNet18 checkpoint;
-- keep `conv1`, `layer1`, `layer2`, and `layer3` frozen;
-- make `layer4` trainable;
-- keep the binary classifier trainable;
-- classifier learning rate: `1e-3`;
-- `layer4` learning rate: `1e-4`;
-- keep the same splits, `pos_weight=8.47`, metrics and threshold analysis.
+Our checkpoint policy protected us from keeping the final overfit state because it retained epoch 5, the epoch with the lowest validation loss.
 
-The frozen checkpoint supplies the model weights, but a new optimizer is created because the set of trainable parameters has changed.
+## Project result
 
-The question is not simply whether training loss decreases. The key question is whether adapting `layer4` improves the validation precision-recall trade-off compared with both frozen ResNet18 and the scratch CNN.
+The saved EXP-009 checkpoint reached the following best tested validation operating point:
 
-## How we will evaluate fine-tuning
+- threshold: `0.70`;
+- precision: `0.9000`;
+- recall: `0.7347`;
+- F1: `0.8090`;
+- TP: `36`;
+- FP: `4`;
+- FN: `13`.
 
-The experiment should change as few variables as possible.
+The result demonstrates both sides of fine-tuning:
 
-We will compare:
+- it can adapt a useful pretrained representation to a shifted target domain;
+- it can also overfit much faster because many more parameters become trainable.
 
-- scratch CNN baseline;
-- frozen pretrained backbone;
-- fine-tuned pretrained backbone.
+## How we evaluate fine-tuning
 
-Using the same target split and metrics:
+The controlled comparison uses the same target split and metrics:
 
 - precision;
 - recall;
@@ -229,7 +246,7 @@ It is whether fine-tuning improves the precision-recall trade-off, especially wh
 
 A concise explanation is:
 
-> Fine-tuning continues training from pretrained weights instead of random initialization. I first test the backbone as a frozen feature extractor, then unfreeze selected layers so the representation can adapt to the industrial domain. I use a conservative learning rate because the goal is to adjust useful pretrained features rather than overwrite them, and I compare the resulting precision-recall trade-off against both the frozen model and the scratch baseline.
+> Fine-tuning continues training from pretrained weights instead of random initialization. I first tested ResNet18 as a frozen feature extractor, which underperformed my scratch CNN because of domain shift. I then unfroze only `layer4`, kept the earlier stages frozen, and used a smaller learning rate for the pretrained block than for the classifier. At the same validation recall of 0.7347, false positives dropped from 113 with the frozen backbone and 26 with the scratch CNN to only 4 after fine-tuning. This showed that pretrained features were useful, but their deeper representation needed adaptation to the industrial domain.
 
 ## Questions to be able to answer
 
@@ -241,4 +258,5 @@ A concise explanation is:
 6. Why might the backbone use a smaller learning rate than the new classifier?
 7. What is catastrophic forgetting in this context?
 8. Why do BatchNorm layers make freezing slightly more subtle?
-9. What evidence would justify moving from a frozen model to fine-tuning?
+9. What evidence from EXP-008 justified fine-tuning?
+10. What evidence from EXP-009 shows that fine-tuning corrected part of the domain shift?
