@@ -6,6 +6,7 @@ This section records the concepts used in M3, where the scratch CNN baseline is 
 
 1. [Pretraining and freezing](topics/pretraining-and-freezing.md)
 2. [Fine-tuning](topics/fine-tuning.md)
+3. [ResNet18 and residual blocks](topics/resnet-and-residual-blocks.md)
 
 ## Core mental model
 
@@ -35,6 +36,7 @@ By the end of M3, we should be able to answer:
 - Why can transfer learning help when the target dataset is relatively small?
 - What is domain shift?
 - Why can a smaller learning rate be appropriate during fine-tuning?
+- How does a residual block differ from a plain stack of convolutions?
 - How should transfer learning be compared fairly against the scratch baseline?
 
 ## Project plan
