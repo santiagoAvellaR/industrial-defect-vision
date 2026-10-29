@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader
 
 from industrial_vision.data.dataset import KSDD2Dataset
 from industrial_vision.evaluation.classification import collect_classification_outputs
-from industrial_vision.models.baseline_cnn import BaselineCNN
+from industrial_vision.models.loading import build_model_from_checkpoint
 from industrial_vision.training.classification import classification_metrics
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Analyze validation errors for the CNN classification baseline."
+        description="Analyze validation errors for a classification checkpoint."
     )
     parser.add_argument("dataset_root", type=Path)
     parser.add_argument("checkpoint", type=Path)
@@ -124,11 +124,14 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    global_pool = checkpoint.get("global_pool", "avg")
-    model = BaselineCNN(global_pool=global_pool).to(device)
+    model = build_model_from_checkpoint(checkpoint).to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
+    dataset = KSDD2Dataset(
+        args.dataset_root,
+        args.val_manifest,
+        imagenet_normalize=checkpoint.get("imagenet_normalize", False),
+    )
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
     probabilities, labels, mask_area_ratios = collect_classification_outputs(
@@ -190,8 +193,11 @@ def main() -> None:
     tp_areas = [row["mask_area_ratio"] for row in records if row["error"] == "tp"]
     fn_areas = [row["mask_area_ratio"] for row in records if row["error"] == "fn"]
 
+    model_name = checkpoint.get("model_name", "baseline_cnn")
     print(f"checkpoint epoch: {checkpoint['epoch']}")
-    print(f"global_pool: {global_pool}")
+    print(f"model: {model_name}")
+    if model_name == "baseline_cnn":
+        print(f"global_pool: {checkpoint.get('global_pool', 'avg')}")
     print(f"threshold: {args.threshold:.2f}")
     print(
         f"tp={metrics['tp']} tn={metrics['tn']} "
