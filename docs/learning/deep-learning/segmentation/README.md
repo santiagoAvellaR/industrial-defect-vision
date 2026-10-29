@@ -4,7 +4,11 @@ This section records the concepts used in M4, where the project moves from image
 
 ## Reading order
 
-1. [Encoder, decoder and U-Net skip connections](topics/encoder-decoder-and-unet.md)
+1. [Encoder, decoder, bottleneck and U-Net skip connections](topics/encoder-decoder-and-unet.md)
+2. [Pixel logits](topics/pixel-logits.md) — how the network produces one learned defect logit at every spatial position.
+3. [Upsampling](topics/upsampling.md) — how a decoder increases spatial resolution and why enlargement alone does not restore lost detail.
+
+For a cross-project visual summary of every architecture studied so far, see the [architecture atlas](../architectures/README.md).
 
 ## Core mental model
 
@@ -31,8 +35,11 @@ By the end of M4, we should be able to answer:
 - Why does segmentation need spatial output instead of a single logit?
 - What is the role of the encoder?
 - What is the role of the decoder?
+- What is the bottleneck?
 - Why can downsampling hurt localization?
+- What does upsampling do, and what can it not recover by itself?
 - Why does U-Net copy high-resolution encoder features into the decoder?
 - How are U-Net skip connections different from ResNet residual connections?
+- How does the final layer produce one logit per pixel?
 - What shape should a binary segmentation model output?
 - How do pixel-level losses and metrics differ from image-level classification metrics?
