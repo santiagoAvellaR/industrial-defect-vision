@@ -4,6 +4,14 @@ This directory is a durable technical learning record, not a dump of every comma
 
 Create a note when a concept is central, recurring, has meaningful trade-offs, caused confusion/bugs, or is relevant to ML/CV interviews.
 
+## Deep-learning map
+
+- [Architecture atlas](deep-learning/architectures/README.md) — visual map of `BaselineCNN`, ResNet18, encoder-decoder and U-Net, with their parts and roles.
+- [CNN fundamentals](deep-learning/cnn/README.md) — tensors, convolution, activations, pooling, classifier and loss.
+- [Training](deep-learning/training/README.md) — gradients, optimizers, epochs, validation, metrics, imbalance, thresholds and error analysis.
+- [Transfer learning](deep-learning/transfer-learning/README.md) — pretraining, freezing, ResNet18 and fine-tuning.
+- [Semantic segmentation](deep-learning/segmentation/README.md) — encoder, decoder, bottleneck, U-Net skips, pixel logits and upsampling.
+
 ## Organization
 
 Prefer a lightweight index plus focused topic notes over one very long document.
