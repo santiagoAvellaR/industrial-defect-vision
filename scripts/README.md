@@ -75,6 +75,23 @@ python scripts/train_baseline.py data/raw/ksdd2 \
 
 This controlled experiment changes only the final global aggregation from average to maximum. The checkpoint stores the pooling mode so evaluation scripts can reconstruct the correct model. Older checkpoints without this field are interpreted as average-pooling checkpoints.
 
+## M3 frozen ResNet18 transfer learning
+
+Train a pretrained ResNet18 while keeping the backbone frozen:
+
+```bash
+python scripts/train_resnet18.py data/raw/ksdd2 \
+  --epochs 10 \
+  --pos-weight 8.47 \
+  --checkpoint artifacts/checkpoints/resnet18_frozen.pt
+```
+
+The script keeps the existing `640 x 224` image resize, adds ImageNet normalization, freezes all backbone parameters and trains only the new `Linear(512, 1)` classifier.
+
+The pretrained weights are downloaded automatically by torchvision the first time they are needed if they are not already cached locally.
+
+For the frozen experiment, the ResNet backbone remains in evaluation mode during classifier training so BatchNorm running statistics stay fixed together with the frozen feature extractor.
+
 ## Validation threshold sweep
 
 A trained checkpoint can be evaluated at different classification thresholds without retraining:
@@ -85,20 +102,13 @@ python scripts/evaluate_thresholds.py \
   artifacts/checkpoints/baseline_cnn_pos_weight_20e.pt
 ```
 
-The script:
-
-- loads the saved model;
-- computes validation probabilities once;
-- evaluates thresholds from `0.10` to `0.90` in steps of `0.05`;
-- reports precision, recall, F1, TP, FP and FN for each threshold;
-- prints the threshold with the highest validation F1;
-- saves `artifacts/figures/threshold_sweep.png`.
+The script reconstructs the model and preprocessing from checkpoint metadata, computes validation scores once, evaluates thresholds from `0.10` to `0.90` in steps of `0.05`, reports precision/recall/F1/TP/FP/FN, prints the threshold with the highest validation F1, and saves a figure.
 
 Threshold selection is performed on validation data. The untouched test split must not be used to choose the threshold.
 
 ## Classification error analysis
 
-Inspect validation errors from the 20-epoch weighted checkpoint at the current `0.80` operating threshold:
+Inspect validation errors from a trained classification checkpoint:
 
 ```bash
 python scripts/analyze_classification_errors.py \
@@ -107,7 +117,7 @@ python scripts/analyze_classification_errors.py \
   --threshold 0.80
 ```
 
-The script saves outputs under `artifacts/error_analysis/`:
+The script reconstructs the model and preprocessing from checkpoint metadata and saves outputs under `artifacts/error_analysis/`:
 
 - `validation_predictions.csv` — one row per validation image with score, prediction, TP/TN/FP/FN type and mask-area ratio;
 - `score_distribution.png` — clean and defective score distributions;
@@ -115,4 +125,4 @@ The script saves outputs under `artifacts/error_analysis/`:
 - `false_negatives.png` — the most confidently missed defects, with the ground-truth mask contour;
 - `false_positives.png` — the most confident false alarms.
 
-This analysis is performed only on validation data. Its purpose is to diagnose the current baseline before choosing the next model change.
+This analysis is performed only on validation data. Its purpose is to diagnose the current model before choosing the next model change.
