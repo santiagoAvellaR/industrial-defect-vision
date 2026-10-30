@@ -89,24 +89,34 @@ The selected `0.90` threshold is validation-derived and checkpoint-specific. It 
 
 ## Qualitative observations
 
-Pending representative prediction inspection using the validation-selected best-Dice checkpoint and threshold `0.90`.
+Representative validation predictions were inspected at threshold `0.90` using the epoch-9 best-Dice checkpoint.
+
+- Best overlap (`12287.png`): Dice `0.9334`, with `2630` ground-truth pixels and `2382` predicted pixels. The predicted region closely matches the visible compact defect and demonstrates that the model can learn accurate localization and shape on some samples.
+- Partial defect (`10421.png`): Dice `0.5488`, with `3090` ground-truth pixels and `1739` predicted pixels. The model detects the correct elongated defect region but predicts only part of its full extent, confirming a real under-segmentation failure mode.
+- False negative (`10574.png`): ground-truth area `5242` pixels with zero predicted foreground pixels. This is not simply a tiny-defect failure: the target is relatively large, yet the model does not produce a meaningful response at the defect location.
+- False positive (`10291.png`): clean target with `4918` predicted foreground pixels. The model produces a strong localized response on background texture, indicating that some normal surface patterns can be confused with defects.
+- Clean correct (`10001.png`): both target and prediction are empty, showing that the model can also suppress foreground correctly on clean samples.
+
+The probability maps show qualitatively different regimes rather than a single thresholding problem: some defects receive a strong, well-localized response; some receive only partial activation; some defects are missed almost entirely; and some clean texture regions receive high-confidence false activations.
 
 ## Failure modes
 
 - Validation predictions remain unstable across epochs even though all-background collapse disappeared.
 - Some epochs strongly over-predict foreground, producing very high false-positive pixel counts.
-- Foreground recall remains limited: even the best-Dice checkpoint detects less than one third of defect pixels.
+- Foreground recall remains limited: even the best-Dice checkpoint detects less than one third of defect pixels globally.
+- Qualitative inspection confirms under-segmentation on some defects, complete misses on others, and localized false positives on clean texture.
+- The false-negative example has a non-trivial target area, so missed defects cannot be explained only by defects being extremely small.
 - Lowest validation loss is not a reliable checkpoint-selection criterion for the final segmentation objective. Epoch 6 had slightly lower loss than epoch 9 but substantially worse Dice.
 
 ## Conclusion
 
 The experiment supports the empty-mask hypothesis. Restricting Dice to non-empty target masks removed the zero-Dice collapse pattern and improved the best observed validation Dice, IoU and recall relative to EXP-010. The improvement is meaningful but does not fully stabilize optimization. The best-Dice checkpoint should therefore be the primary segmentation checkpoint, while validation loss remains useful as a training diagnostic rather than the sole model-selection criterion.
 
-Threshold tuning provides a smaller additional gain and selects `0.90` for the epoch-9 checkpoint on validation data.
+Threshold tuning provides a smaller additional gain and selects `0.90` for the epoch-9 checkpoint on validation data. Qualitative inspection shows that the remaining error is not primarily caused by one poorly chosen threshold: the model can segment some defects very accurately but alternates between partial coverage, complete misses and strong false activations on clean texture.
 
 ## Next action
 
-Inspect representative qualitative predictions at threshold `0.90` before changing another training variable. The next controlled training hypothesis, if the visual evidence remains consistent with unstable foreground extent, is to reduce the Adam learning rate while keeping the EXP-011 loss formulation unchanged.
+Run a controlled learning-rate experiment while keeping the EXP-011 loss formulation, architecture, data split, seed, batch size, epoch count and thresholding procedure unchanged. Reduce Adam LR from `1e-3` to `3e-4` and compare training stability plus best validation Dice/IoU/precision/recall. If the lower LR merely slows learning without reducing instability, investigate longer training as a separate follow-up rather than changing both variables at once.
 
 ## MLflow run
 
