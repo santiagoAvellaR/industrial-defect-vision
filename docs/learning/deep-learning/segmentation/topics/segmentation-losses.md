@@ -170,13 +170,46 @@ Validation IoU and Dice are **hard metrics**:
 ```text
 logits
 -> sigmoid
--> threshold (default 0.5)
+-> threshold
 -> binary mask
 -> TP / FP / FN
 -> IoU and Dice
 ```
 
 Do not confuse Dice loss with the reported validation Dice metric. They are closely related conceptually but serve different purposes.
+
+## Threshold sweep
+
+A **threshold sweep** means evaluating the same trained model several times with different decision thresholds, without retraining it.
+
+For example:
+
+```text
+same predicted probabilities
+-> threshold 0.10 -> metrics
+-> threshold 0.20 -> metrics
+-> threshold 0.30 -> metrics
+...
+-> threshold 0.90 -> metrics
+```
+
+The model parameters do not change. Only the rule used to convert probabilities into a binary mask changes.
+
+This lets us study the precision/recall trade-off and select a threshold on the validation split. A lower threshold usually predicts more foreground and tends to increase recall at the cost of more false positives. A higher threshold is more conservative and tends to increase precision while reducing recall.
+
+The threshold must be selected using validation data, not the test set. Once selected, it should be frozen before final test evaluation.
+
+In EXP-010 the sweep showed that changing the threshold barely affected Dice, so threshold choice was not the main problem. In EXP-011 and EXP-012, threshold tuning produced a modest additional improvement after the training changes had already improved the model itself.
+
+## Training stability
+
+Training is considered unstable when model behavior changes strongly from one epoch to the next instead of evolving in a reasonably consistent direction.
+
+Normal training can contain some noise, so one temporary decrease is not enough to call training unstable. Strong evidence includes repeated large swings in validation metrics or prediction behavior.
+
+EXP-011 showed this pattern. Consecutive epochs could move between very different operating points, for example from high precision and low recall to low precision and high recall, with large changes in false-positive pixels. Dice also improved, worsened and recovered repeatedly rather than following a smoother trend.
+
+This motivated EXP-012, where the learning rate was reduced while keeping the architecture and loss formulation fixed.
 
 ## Checkpoint selection
 
@@ -195,7 +228,7 @@ This keeps optimization evidence and task-metric evidence separate instead of as
 
 A concise explanation is:
 
-> Pixel-level defect segmentation is extremely imbalanced because most pixels are background. BCE provides local supervision but can be dominated by background, while Dice focuses on foreground overlap. In the first U-Net run I also found that per-image Dice on many empty masks could add pressure toward all-background predictions. I therefore tested a controlled variant where BCE still supervises every image but Dice is applied only when the target mask contains foreground.
+> Pixel-level defect segmentation is extremely imbalanced because most pixels are background. BCE provides local supervision but can be dominated by background, while Dice focuses on foreground overlap. In the first U-Net run I also found that per-image Dice on many empty masks could add pressure toward all-background predictions. I therefore tested a controlled variant where BCE still supervises every image but Dice is applied only when the target mask contains foreground. I then used validation threshold sweeps to separate model-learning problems from decision-threshold effects, and reduced the learning rate when epoch-to-epoch metrics showed unstable optimization.
 
 ## Questions to be able to answer
 
@@ -208,3 +241,6 @@ A concise explanation is:
 7. What complementary information do BCE and Dice contribute?
 8. Why are Dice loss and validation Dice related but not identical?
 9. Why can best validation loss and best validation Dice select different checkpoints?
+10. What is a threshold sweep and why does it not require retraining the model?
+11. Why should a threshold be selected on validation rather than test data?
+12. What evidence distinguishes unstable training from normal epoch-to-epoch noise?
