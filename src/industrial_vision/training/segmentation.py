@@ -3,16 +3,29 @@ from torch import nn
 
 
 class BCEDiceLoss(nn.Module):
-    def __init__(self, smooth: float = 1.0) -> None:
+    def __init__(
+        self,
+        smooth: float = 1.0,
+        dice_on_positive_masks_only: bool = False,
+    ) -> None:
         super().__init__()
         self.bce = nn.BCEWithLogitsLoss()
         self.smooth = smooth
+        self.dice_on_positive_masks_only = dice_on_positive_masks_only
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         bce_loss = self.bce(logits, targets)
 
         probabilities = torch.sigmoid(logits)
         dimensions = (1, 2, 3)
+
+        if self.dice_on_positive_masks_only:
+            positive_masks = targets.sum(dim=dimensions) > 0
+            if not bool(positive_masks.any()):
+                return bce_loss
+            probabilities = probabilities[positive_masks]
+            targets = targets[positive_masks]
+
         intersection = (probabilities * targets).sum(dim=dimensions)
         denominator = probabilities.sum(dim=dimensions) + targets.sum(dim=dimensions)
         dice = (2 * intersection + self.smooth) / (denominator + self.smooth)
