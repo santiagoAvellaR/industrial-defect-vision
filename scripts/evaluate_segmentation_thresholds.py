@@ -30,6 +30,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def metrics_from_counts(tp: int, fp: int, fn: int) -> dict[str, float | int]:
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    iou = tp / (tp + fp + fn) if tp + fp + fn else 1.0
+    dice = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 1.0
+
+    return {
+        "precision": precision,
+        "recall": recall,
+        "iou": iou,
+        "dice": dice,
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+    }
+
+
 def main() -> None:
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,19 +59,23 @@ def main() -> None:
     dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
-    probabilities = []
-    masks = []
+    thresholds = torch.linspace(0.10, 0.90, 17).tolist()
+    counts = {
+        threshold: {"tp": 0, "fp": 0, "fn": 0}
+        for threshold in thresholds
+    }
 
     with torch.inference_mode():
-        for images, batch_masks, _ in loader:
+        for images, masks, _ in loader:
             logits = model(images.to(device))
-            probabilities.append(torch.sigmoid(logits).cpu())
-            masks.append(batch_masks.cpu())
+            probabilities = torch.sigmoid(logits).cpu()
 
-    probabilities = torch.cat(probabilities)
-    masks = torch.cat(masks)
+            for threshold in thresholds:
+                metrics = segmentation_metrics(probabilities, masks, threshold)
+                counts[threshold]["tp"] += int(metrics["tp"])
+                counts[threshold]["fp"] += int(metrics["fp"])
+                counts[threshold]["fn"] += int(metrics["fn"])
 
-    thresholds = torch.linspace(0.10, 0.90, 17).tolist()
     rows = []
 
     print(f"checkpoint epoch: {checkpoint['epoch']}")
@@ -65,7 +86,12 @@ def main() -> None:
     print("--------- ------- ------- --------- ------- -------- -------- --------")
 
     for threshold in thresholds:
-        metrics = segmentation_metrics(probabilities, masks, threshold)
+        threshold_counts = counts[threshold]
+        metrics = metrics_from_counts(
+            threshold_counts["tp"],
+            threshold_counts["fp"],
+            threshold_counts["fn"],
+        )
         rows.append((threshold, metrics))
         print(
             f"{threshold:9.2f} "
