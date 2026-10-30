@@ -125,26 +125,29 @@ def main() -> None:
         axes = axes.reshape(1, -1)
 
     column_titles = ["Image", "Ground truth", "Probability map", "Prediction"]
-    for axis, title in zip(axes[0], column_titles):
-        axis.set_title(title)
 
     with torch.inference_mode():
-        for row_axes, (case_name, record) in zip(axes, selected):
+        for row_index, (row_axes, (case_name, record)) in enumerate(zip(axes, selected)):
             index = record["index"]
             model_image, mask, _ = model_dataset[index]
             display_image, _, _ = display_dataset[index]
             probability = torch.sigmoid(model(model_image.unsqueeze(0).to(device)))[0, 0].cpu()
             prediction = probability >= args.threshold
             sample = model_dataset.samples[index]
+            dice_text = f"Dice={record['dice']:.3f}" if record["gt_pixels"] > 0 else "Dice=n/a"
 
             row_axes[0].imshow(display_image.permute(1, 2, 0))
-            row_axes[0].set_ylabel(
-                f"{case_name}\nDice={record['dice']:.3f}\n{Path(sample['image']).name}",
+            row_axes[0].set_title(
+                f"{column_titles[0]} — {case_name}\n{dice_text} — {Path(sample['image']).name}",
                 fontsize=8,
             )
             row_axes[1].imshow(mask[0], vmin=0, vmax=1)
             row_axes[2].imshow(probability, vmin=0, vmax=1)
             row_axes[3].imshow(prediction, vmin=0, vmax=1)
+
+            if row_index == 0:
+                for axis, title in zip(row_axes[1:], column_titles[1:]):
+                    axis.set_title(title)
 
             for axis in row_axes:
                 axis.axis("off")
@@ -162,9 +165,10 @@ def main() -> None:
     print(f"threshold: {args.threshold:.2f}")
     for case_name, record in selected:
         sample = model_dataset.samples[record["index"]]
+        dice_text = f"{record['dice']:.4f}" if record["gt_pixels"] > 0 else "n/a"
         print(
             f"{case_name}: {sample['image']} "
-            f"dice={record['dice']:.4f} "
+            f"dice={dice_text} "
             f"gt_pixels={record['gt_pixels']} pred_pixels={record['pred_pixels']}"
         )
     print(f"saved figure: {args.figure}")
