@@ -58,7 +58,7 @@ It directly counteracts the foreground/background imbalance while preserving the
 
 For datasets with extremely small defects, the pixel ratio can make `pos_weight` very large. That value becomes an important hyperparameter and can push the model toward excessive foreground prediction if chosen poorly.
 
-For the first M4 baseline we therefore do not introduce this extra variable yet. It remains a controlled follow-up experiment if the first model under-detects foreground.
+Weighted BCE remains a controlled follow-up if simpler changes do not improve foreground recall.
 
 ## 3. Dice coefficient and Dice loss
 
@@ -99,15 +99,37 @@ Dice loss is:
 
 Dice directly rewards overlap with the small foreground region and is not dominated by the enormous number of correctly predicted background pixels.
 
-### Limitation of pure Dice loss
+### Empty masks
 
-Pure Dice gives a more global overlap signal rather than an independent local penalty at each pixel. Empty masks also require careful handling because there is no foreground intersection to measure.
+If an image has no foreground, then `y_i = 0` for every pixel. The per-image soft Dice becomes:
 
-For a dataset containing many clean images, using Dice alone is therefore not the simplest first choice.
+```math
+\mathrm{SoftDice}_{empty}
+=
+\frac{s}{\sum_i p_i+s}
+```
 
-## 4. BCE + Dice: first M4 baseline
+There is no foreground overlap to reward. The Dice term instead becomes small only when the predicted foreground probability mass approaches zero.
 
-The first SimpleUNet experiment uses:
+That is not mathematically invalid, but its effect matters when a dataset contains many clean images. If Dice is calculated independently for every image and then averaged, many empty masks can repeatedly push the model toward all-background predictions.
+
+BCE already provides pixel-wise supervision on those clean images, so one controlled alternative is:
+
+```text
+clean image:
+BCE  -> used
+Dice -> skipped
+
+image with defect:
+BCE  -> used
+Dice -> used
+```
+
+This is the hypothesis tested in EXP-011.
+
+## 4. BCE + Dice
+
+The first SimpleUNet experiment, EXP-010, used:
 
 ```math
 \mathrm{Loss}
@@ -116,6 +138,8 @@ The first SimpleUNet experiment uses:
 +
 \mathrm{DiceLoss}
 ```
+
+with Dice calculated for every target mask, including empty masks.
 
 The implementation is in:
 
@@ -133,7 +157,9 @@ Dice
 -> reduces the dominance of true-negative background pixels
 ```
 
-This is not assumed to be universally optimal. It is a deliberately simple starting point that addresses the known imbalance without adding a pixel `pos_weight` hyperparameter yet.
+EXP-010 learned non-trivial defect localization but showed low foreground recall and strong epoch-to-epoch instability. A validation threshold sweep from `0.10` to `0.90` changed Dice only slightly, so threshold calibration was not the primary explanation.
+
+EXP-011 therefore keeps BCE on every image but calculates the Dice term only for non-empty target masks. This isolates the treatment of empty masks without simultaneously changing the optimizer, learning rate, architecture or data split.
 
 ## Training versus evaluation
 
@@ -152,24 +178,24 @@ logits
 
 Do not confuse Dice loss with the reported validation Dice metric. They are closely related conceptually but serve different purposes.
 
-## Current baseline decision
+## Checkpoint selection
 
-For the first M4 segmentation run:
+EXP-010 selected only the lowest validation-loss checkpoint. The run showed that lowest validation loss and highest validation Dice can occur at different epochs.
+
+From EXP-011 onward, SimpleUNet training preserves both:
 
 ```text
-model      = SimpleUNet
-loss       = BCE + Dice
-threshold  = 0.5
-checkpoint = lowest validation loss
+best validation loss checkpoint
+best validation Dice checkpoint
 ```
 
-If error analysis later shows poor foreground recall, weighted BCE is a natural controlled experiment. If boundaries or tiny defects remain difficult, the next change should be justified from predictions rather than added automatically.
+This keeps optimization evidence and task-metric evidence separate instead of assuming they identify the same model state.
 
 ## Interview explanation
 
 A concise explanation is:
 
-> Pixel-level defect segmentation is extremely imbalanced because most pixels are background. Plain BCE provides useful local supervision but can be dominated by background. Dice focuses directly on foreground overlap and ignores true negatives. For the first U-Net baseline I combined BCE and soft Dice so training receives both local pixel-wise supervision and an overlap-based signal, while keeping weighted BCE as a later controlled experiment.
+> Pixel-level defect segmentation is extremely imbalanced because most pixels are background. BCE provides local supervision but can be dominated by background, while Dice focuses on foreground overlap. In the first U-Net run I also found that per-image Dice on many empty masks could add pressure toward all-background predictions. I therefore tested a controlled variant where BCE still supervises every image but Dice is applied only when the target mask contains foreground.
 
 ## Questions to be able to answer
 
@@ -177,6 +203,8 @@ A concise explanation is:
 2. What does `pos_weight` change in weighted BCE?
 3. Why does Dice not depend on true negatives?
 4. Why must training Dice use probabilities rather than thresholded predictions?
-5. Why can pure Dice be awkward for empty masks?
-6. What complementary information do BCE and Dice contribute?
-7. Why are Dice loss and validation Dice related but not identical?
+5. What does per-image Dice become when the target mask is empty?
+6. Why might skipping Dice on empty masks help while still keeping BCE there?
+7. What complementary information do BCE and Dice contribute?
+8. Why are Dice loss and validation Dice related but not identical?
+9. Why can best validation loss and best validation Dice select different checkpoints?
