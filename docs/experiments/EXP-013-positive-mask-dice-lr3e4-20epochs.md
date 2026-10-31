@@ -22,7 +22,7 @@ Keep EXP-012 unchanged except for training duration:
 - Batch size: 4
 - Loss: BCE on all images + soft Dice only on non-empty target masks
 - Epochs: 20
-- Hardware: to be recorded after run
+- Hardware: CPU
 - Evaluation threshold during training: 0.5
 - Checkpoints: lowest validation loss and highest validation Dice
 
@@ -36,23 +36,51 @@ EXP-013:
 
 `epochs = 20`
 
-No other training variable should change.
+No other training variable changed.
 
 ## Results
 
-Pending.
+Training beyond epoch 10 improved the best validation result, so EXP-012 had stopped before the best observed model state.
 
-## Questions to answer after the run
+Best validation-Dice checkpoint:
 
-1. Does best validation Dice improve beyond EXP-012 (`0.3897` at threshold 0.5)?
-2. Does validation loss continue decreasing after epoch 10?
-3. Do metrics plateau, continue improving, or begin to overfit?
-4. Does the lower learning rate remain reasonably stable over the longer run?
-5. Which epoch is selected by best validation Dice and best validation loss?
+| Metric | EXP-012 best Dice | EXP-013 best Dice |
+|---|---:|---:|
+| Epoch | 10 | 17 |
+| Dice | 0.3897 | 0.4201 |
+| IoU | 0.2420 | 0.2659 |
+| Precision | 0.5611 | 0.6702 |
+| Recall | 0.2985 | 0.3060 |
+
+Best validation-loss checkpoint in EXP-013 occurred at epoch 19:
+
+- validation loss: `0.1948`
+- Dice: `0.4199`
+- IoU: `0.2657`
+- precision: `0.6511`
+- recall: `0.3099`
+
+The best Dice improved by `+0.0304` absolute relative to EXP-012 at the common training threshold of `0.5`.
+
+## Interpretation
+
+The 20-epoch run shows that ten epochs were not sufficient for this lower-learning-rate configuration. Useful validation improvements occurred well after epoch 10, with the best Dice at epoch 17 and best loss at epoch 19.
+
+However, optimization is still not completely smooth. Validation metrics continue to move between more conservative and more aggressive foreground predictions across epochs, and training metrics also oscillate. The longer run therefore improves the model but does not remove the remaining instability.
+
+There is no clear monotonic overfitting pattern in this run: validation quality reaches new best values late in training rather than consistently degrading while training improves.
+
+## Conclusion
+
+EXP-013 supports the hypothesis that EXP-012 was stopped too early. Extending training from 10 to 20 epochs improved validation Dice and IoU while preserving the lower learning rate and loss formulation.
+
+The next expensive training experiment should not be launched on the local CPU. Remote GPU execution should be introduced first so subsequent controlled experiments can be run efficiently without changing the training code.
 
 ## Next action
 
-After training, run a threshold sweep on the best-Dice checkpoint before deciding whether to change another training variable.
+1. Introduce a reproducible remote-GPU workflow while keeping code in Git and datasets/checkpoints outside Git.
+2. Run a validation threshold sweep on the EXP-013 best-Dice checkpoint.
+3. Only after closing EXP-013 decide whether the next modeling experiment should change loss weighting, sampling, augmentation or another single variable.
 
 ## MLflow run
 
