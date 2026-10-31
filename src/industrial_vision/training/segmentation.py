@@ -100,6 +100,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     threshold: float = 0.5,
+    non_blocking: bool = False,
 ) -> dict[str, float | int]:
     model.train()
 
@@ -108,8 +109,8 @@ def train_one_epoch(
     tp = tn = fp = fn = 0
 
     for images, masks, _ in loader:
-        images = images.to(device)
-        masks = masks.to(device)
+        images = images.to(device, non_blocking=non_blocking)
+        masks = masks.to(device, non_blocking=non_blocking)
 
         optimizer.zero_grad()
 
@@ -140,6 +141,7 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     threshold: float = 0.5,
+    non_blocking: bool = False,
 ) -> dict[str, float | int]:
     model.eval()
 
@@ -149,8 +151,8 @@ def evaluate(
 
     with torch.no_grad():
         for images, masks, _ in loader:
-            images = images.to(device)
-            masks = masks.to(device)
+            images = images.to(device, non_blocking=non_blocking)
+            masks = masks.to(device, non_blocking=non_blocking)
 
             logits = model(images)
             loss = criterion(logits, masks)
