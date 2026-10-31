@@ -75,6 +75,7 @@ def test_train_one_epoch_updates_segmentation_model() -> None:
         criterion,
         optimizer,
         torch.device("cpu"),
+        non_blocking=True,
     )
 
     assert not torch.equal(before, model.conv.weight.detach())
@@ -91,7 +92,13 @@ def test_evaluate_does_not_update_segmentation_model() -> None:
     criterion = BCEDiceLoss()
     before = model.conv.weight.detach().clone()
 
-    metrics = evaluate(model, loader, criterion, torch.device("cpu"))
+    metrics = evaluate(
+        model,
+        loader,
+        criterion,
+        torch.device("cpu"),
+        non_blocking=True,
+    )
 
     assert torch.equal(before, model.conv.weight.detach())
     assert metrics["loss"] >= 0
