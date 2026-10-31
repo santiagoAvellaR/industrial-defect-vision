@@ -1,169 +1,192 @@
-# Remote training workflow
+# Remote GPU training workflow
 
 ## Goal
 
-Run expensive PyTorch training on remote GPU compute without changing the modeling code or turning the project into a notebook-only workflow.
+Run the existing PyTorch training pipeline on remote GPU compute without introducing provider-specific ML code.
 
-The repository stays the source of truth for code and experiment configuration. Raw datasets and large artifacts stay outside Git.
+Current validated provider: Camber Cloud Student with one NVIDIA L4.
 
-## Initial backend: Lightning AI Studio
-
-Lightning is the first remote backend because it supports persistent environments, persistent/shared storage, GPU switching and SSH/local-IDE access while preserving a normal repository workflow.
-
-Current provider quotas and pricing are external operational details and should be checked before each period of use.
-
-## One-time setup
-
-### 1. Create a Studio on CPU
-
-Do setup work on the free CPU machine. Only switch to GPU when training is ready.
-
-### 2. Clone the repository
-
-```bash
-git clone https://github.com/santiagoAvellaR/industrial-defect-vision.git
-cd industrial-defect-vision
-git switch feat/m4-segmentation-threshold-sweep
-```
-
-After the feature branch is merged, use `main` instead.
-
-### 3. Install the project
-
-```bash
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-Verify the environment:
-
-```bash
-python -m pytest
-```
-
-### 4. Upload KSDD2 once
-
-Keep KSDD2 in persistent remote storage, not in Git.
-
-Expected project path:
+## Separation of responsibilities
 
 ```text
-data/raw/ksdd2/
+Git/GitHub
+-> source code, tests and documentation
+
+Persistent storage
+-> raw dataset archives, checkpoints and durable artifacts
+
+Ephemeral node storage
+-> staged dataset used during active training
+
+Remote GPU
+-> model training and validation
 ```
 
-If the provider stores uploads elsewhere, create a symlink or copy into the expected path so training commands remain provider-independent.
+The repository intentionally ignores raw datasets and model weights.
+
+## Camber session startup checklist
+
+From the remote project directory:
+
+```bash
+git pull --ff-only
+python -m pip install -e ".[dev]"
+python -m pytest
+python -c "import industrial_vision"
+nvidia-smi
+python -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
+```
+
+Do not assume that switching the Camber compute node automatically switches an already running Jupyter server. If `nvidia-smi` is unavailable or `torch.cuda.is_available()` is false, restart the Jupyter server from JupyterHub on the GPU compute before training.
+
+The editable Python installation may also need to be repeated after a server/compute restart even when project files persist.
+
+## Dataset staging
+
+Reading KSDD2 directly from Camber Stash caused severe small-file I/O overhead because the dataset contains thousands of PNG files. The validated approach is to stage KSDD2 to local node storage before training.
+
+### Direct-copy method
+
+If the persistent dataset exists as `data/raw/ksdd2`:
+
+```bash
+rm -rf /tmp/ksdd2
+cp -a data/raw/ksdd2 /tmp/ksdd2
+```
+
+Train against:
+
+```text
+/tmp/ksdd2
+```
+
+A full SimpleUNet epoch plus validation took about 35 seconds on the NVIDIA L4 after staging to `/tmp`, while direct Stash access was dramatically slower.
+
+### Recommended archive method
+
+Create the archive once after a correct KSDD2 copy is available:
+
+```bash
+tar -cf data/raw/ksdd2.tar -C /tmp ksdd2
+```
+
+On future sessions, transfer one large sequential file and extract it locally:
+
+```bash
+rm -rf /tmp/ksdd2 /tmp/ksdd2.tar
+cp data/raw/ksdd2.tar /tmp/ksdd2.tar
+tar -xf /tmp/ksdd2.tar -C /tmp
+```
+
+Verify:
+
+```bash
+find /tmp/ksdd2 -type f | wc -l
+```
+
+The archive is infrastructure data and must remain outside Git.
+
+## DataLoader runtime controls
+
+`train_simple_unet.py` exposes:
+
+```text
+--batch-size
+--num-workers
+--pin-memory
+```
+
+Defaults remain conservative and preserve previous local behavior:
+
+```text
+batch_size=4
+num_workers=0
+pin_memory=False
+```
+
+When `--pin-memory` is enabled on CUDA, host tensors are pinned and training/evaluation use non-blocking device transfers.
+
+These are runtime-performance controls. Changing them for benchmarking does not automatically define a new ML experiment.
+
+## Infrastructure benchmark
+
+Before the next expensive experiment, benchmark short disposable runs using `/tmp/ksdd2`.
+
+Suggested first values:
+
+```text
+batch_size:   4, 8, 16
+num_workers:  0, 2, 4
+pin_memory:   off/on
+```
+
+Do not exhaustively run every combination unless needed. Start from the validated baseline and change one infrastructure variable at a time.
 
 Example:
 
 ```bash
-mkdir -p data/raw
-ln -s /teamspace/uploads/ksdd2 data/raw/ksdd2
+time python scripts/train_simple_unet.py /tmp/ksdd2 \
+  --epochs 1 \
+  --batch-size 4 \
+  --num-workers 2 \
+  --pin-memory \
+  --learning-rate 3e-4 \
+  --threshold 0.5 \
+  --dice-positive-only \
+  --checkpoint /tmp/benchmark_best_loss.pt \
+  --dice-checkpoint /tmp/benchmark_best_dice.pt
 ```
 
-Adjust the source path to the actual uploaded dataset location.
+Record at least:
 
-## Before every GPU run
+- wall-clock time;
+- GPU utilization from `nvidia-smi` while the run is active;
+- observed/peak VRAM;
+- batch size;
+- worker count;
+- pin-memory setting.
 
-Pull the exact code to execute:
+Metrics from these disposable runs are not used to compare model quality when `batch_size` changes, because batch size can alter optimization dynamics.
+
+## Running a real experiment
+
+Use the same command locally or remotely; only the dataset path and runtime-performance flags may differ.
+
+Example on Camber:
 
 ```bash
-git status
-git pull --ff-only
-```
-
-Run focused tests on CPU before consuming GPU credits:
-
-```bash
-python -m pytest tests/test_training_segmentation.py tests/test_model_loading_simple_unet.py
-```
-
-Then switch the Studio to a GPU.
-
-Verify CUDA:
-
-```bash
-nvidia-smi
-python -c "import torch; print('cuda:', torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
-```
-
-The training script should print:
-
-```text
-device: cuda
-```
-
-If it prints `device: cpu`, stop and fix the environment before launching a long run.
-
-## Running an experiment
-
-Use the same command that would be used locally. Example:
-
-```bash
-python scripts/train_simple_unet.py data/raw/ksdd2 \
+python scripts/train_simple_unet.py /tmp/ksdd2 \
   --epochs 20 \
   --batch-size 4 \
+  --num-workers 2 \
+  --pin-memory \
   --learning-rate 3e-4 \
   --threshold 0.5 \
   --dice-positive-only \
   --checkpoint artifacts/checkpoints/example_best_loss.pt
 ```
 
-Do not change batch size only because a larger GPU is available unless batch size itself is the controlled experimental variable. Reproducible comparisons require keeping experiment variables explicit.
+The modeling code remains standard PyTorch. Camber is infrastructure, not a project dependency.
 
-## Artifacts
+## Durable outputs
 
-Git tracks:
+Never rely on `/tmp` for artifacts that must survive the node/session.
 
-- source code;
-- manifests and small configuration files;
-- experiment documentation;
-- architecture decisions.
-
-Git does not track:
-
-- raw KSDD2 data;
-- `.pt`, `.pth`, `.ckpt` weights;
-- other large generated model artifacts.
-
-After a useful run, preserve the best checkpoints and figures in persistent remote storage and copy important artifacts back when needed. MLflow/artifact storage will later formalize this process.
-
-## Development from the laptop
-
-Preferred professional-style workflow:
+After a real experiment, keep checkpoints and figures in persistent project storage, for example:
 
 ```text
-local VS Code / terminal
-        |
-        | SSH
-        v
-remote Lightning Studio
-        |
-        +-- code executes remotely
-        +-- data lives remotely
-        +-- GPU lives remotely
+artifacts/checkpoints/
+artifacts/figures/
 ```
 
-This keeps the familiar editor while moving compute away from the laptop.
+Then stop the GPU compute when training and analysis are complete.
 
-## Fallbacks
+## Provider portability
 
-- **Kaggle**: quick free GPU fallback for isolated runs.
-- **Camber Student**: additional student GPU quota through GitHub Education.
-- **UTC PILCAM2 / BMBI**: academic/HPC route to investigate in parallel. If access is granted, add a separate scheduler runbook rather than modifying model code for UTC.
+The same structure should work with another remote backend later:
 
-## Reproducibility rule
+```text
+Git -> remote environment -> local-to-node dataset staging -> PyTorch CUDA -> persistent artifacts
+```
 
-Changing where an experiment runs should not change its scientific definition.
-
-For a controlled comparison, preserve:
-
-- dataset split;
-- seed;
-- architecture;
-- loss;
-- learning rate;
-- batch size;
-- epoch count;
-- threshold used during reporting.
-
-Record hardware/device separately as experiment metadata.
+A future UTC/HPC integration may add scheduler-specific run commands, but it should not modify model architecture or training logic.
