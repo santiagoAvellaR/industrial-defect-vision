@@ -2,6 +2,7 @@ from torch import nn
 
 from industrial_vision.models.baseline_cnn import BaselineCNN
 from industrial_vision.models.resnet18_classifier import ResNet18Classifier
+from industrial_vision.models.simple_unet import SimpleUNet
 
 
 def build_model_from_checkpoint(checkpoint: dict) -> nn.Module:
@@ -21,5 +22,8 @@ def build_model_from_checkpoint(checkpoint: dict) -> nn.Module:
             weights=None,
             trainable_backbone=trainable_backbone,
         )
+
+    if model_name == "simple_unet":
+        return SimpleUNet()
 
     raise ValueError(f"unknown model_name: {model_name}")

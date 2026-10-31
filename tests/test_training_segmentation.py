@@ -44,6 +44,15 @@ def test_bce_dice_loss_prefers_better_logits() -> None:
     assert criterion(good_logits, targets) < criterion(bad_logits, targets)
 
 
+def test_positive_only_dice_uses_bce_for_empty_masks() -> None:
+    logits = torch.tensor([[[[1.0, -1.0], [0.5, -0.5]]]])
+    targets = torch.zeros_like(logits)
+    criterion = BCEDiceLoss(dice_on_positive_masks_only=True)
+    expected = nn.BCEWithLogitsLoss()(logits, targets)
+
+    assert torch.allclose(criterion(logits, targets), expected)
+
+
 def test_train_one_epoch_updates_segmentation_model() -> None:
     images = torch.tensor(
         [
@@ -66,6 +75,7 @@ def test_train_one_epoch_updates_segmentation_model() -> None:
         criterion,
         optimizer,
         torch.device("cpu"),
+        non_blocking=True,
     )
 
     assert not torch.equal(before, model.conv.weight.detach())
@@ -82,7 +92,13 @@ def test_evaluate_does_not_update_segmentation_model() -> None:
     criterion = BCEDiceLoss()
     before = model.conv.weight.detach().clone()
 
-    metrics = evaluate(model, loader, criterion, torch.device("cpu"))
+    metrics = evaluate(
+        model,
+        loader,
+        criterion,
+        torch.device("cpu"),
+        non_blocking=True,
+    )
 
     assert torch.equal(before, model.conv.weight.detach())
     assert metrics["loss"] >= 0

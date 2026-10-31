@@ -20,9 +20,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--threshold", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=0,
+        help="Number of DataLoader worker processes. Default preserves the local baseline.",
+    )
+    parser.add_argument(
+        "--pin-memory",
+        action="store_true",
+        help="Pin DataLoader host memory and use non-blocking CUDA transfers when CUDA is active.",
+    )
+    parser.add_argument(
+        "--dice-positive-only",
+        action="store_true",
+        help="Compute the Dice term only for target masks that contain foreground.",
+    )
+    parser.add_argument(
         "--checkpoint",
         type=Path,
         default=Path("artifacts/checkpoints/simple_unet_bce_dice.pt"),
+        help="Checkpoint selected by lowest validation loss.",
+    )
+    parser.add_argument(
+        "--dice-checkpoint",
+        type=Path,
+        default=None,
+        help="Checkpoint selected by highest validation Dice.",
     )
     return parser.parse_args()
 
@@ -41,32 +64,66 @@ def print_metrics(split: str, metrics: dict[str, float | int]) -> None:
 
 def main() -> None:
     args = parse_args()
+    if args.num_workers < 0:
+        raise ValueError("--num-workers must be >= 0")
+
     torch.manual_seed(args.seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pin_memory = args.pin_memory and device.type == "cuda"
+    non_blocking = pin_memory
+    device_name = (
+        torch.cuda.get_device_name(0) if device.type == "cuda" else "cpu"
+    )
+    loss_name = "bce_dice_positive_masks_only" if args.dice_positive_only else "bce_dice"
+    dice_checkpoint = args.dice_checkpoint
+    if dice_checkpoint is None:
+        stem = args.checkpoint.stem
+        if stem.endswith("_best_loss"):
+            stem = stem.removesuffix("_best_loss") + "_best_dice"
+        else:
+            stem = stem + "_best_dice"
+        dice_checkpoint = args.checkpoint.with_name(stem + args.checkpoint.suffix)
+
     print(f"device: {device}")
+    print(f"device name: {device_name}")
     print("model: simple_unet")
-    print("loss: bce + dice")
+    print(
+        "loss: bce + dice (positive masks only)"
+        if args.dice_positive_only
+        else "loss: bce + dice"
+    )
     print(f"threshold: {args.threshold}")
+    print(
+        f"data loader: batch_size={args.batch_size} "
+        f"num_workers={args.num_workers} pin_memory={pin_memory}"
+    )
 
     train_dataset = KSDD2Dataset(args.dataset_root, args.train_manifest)
     val_dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
 
     generator = torch.Generator().manual_seed(args.seed)
+    loader_kwargs = {
+        "batch_size": args.batch_size,
+        "num_workers": args.num_workers,
+        "pin_memory": pin_memory,
+    }
     train_loader = DataLoader(
         train_dataset,
-        batch_size=args.batch_size,
         shuffle=True,
         generator=generator,
+        **loader_kwargs,
     )
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, shuffle=False, **loader_kwargs)
 
     model = SimpleUNet().to(device)
-    criterion = BCEDiceLoss()
+    criterion = BCEDiceLoss(dice_on_positive_masks_only=args.dice_positive_only)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     best_val_loss = float("inf")
+    best_val_dice = float("-inf")
     args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    dice_checkpoint.parent.mkdir(parents=True, exist_ok=True)
 
     for epoch in range(1, args.epochs + 1):
         train_metrics = train_one_epoch(
@@ -76,6 +133,7 @@ def main() -> None:
             optimizer,
             device,
             threshold=args.threshold,
+            non_blocking=non_blocking,
         )
         val_metrics = evaluate(
             model,
@@ -83,29 +141,41 @@ def main() -> None:
             criterion,
             device,
             threshold=args.threshold,
+            non_blocking=non_blocking,
         )
 
         print(f"\nEpoch {epoch}/{args.epochs}")
         print_metrics("train", train_metrics)
         print_metrics("val  ", val_metrics)
 
+        checkpoint = {
+            "epoch": epoch,
+            "model_name": "simple_unet",
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "val_loss": float(val_metrics["loss"]),
+            "val_metrics": val_metrics,
+            "loss_name": loss_name,
+            "dice_on_positive_masks_only": args.dice_positive_only,
+            "threshold": args.threshold,
+            "seed": args.seed,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "num_workers": args.num_workers,
+            "pin_memory": pin_memory,
+            "device_type": device.type,
+            "device_name": device_name,
+        }
+
         if val_metrics["loss"] < best_val_loss:
             best_val_loss = float(val_metrics["loss"])
-            torch.save(
-                {
-                    "epoch": epoch,
-                    "model_name": "simple_unet",
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "val_loss": best_val_loss,
-                    "val_metrics": val_metrics,
-                    "loss_name": "bce_dice",
-                    "threshold": args.threshold,
-                    "seed": args.seed,
-                },
-                args.checkpoint,
-            )
-            print(f"saved best checkpoint: {args.checkpoint}")
+            torch.save(checkpoint, args.checkpoint)
+            print(f"saved best-loss checkpoint: {args.checkpoint}")
+
+        if val_metrics["dice"] > best_val_dice:
+            best_val_dice = float(val_metrics["dice"])
+            torch.save(checkpoint, dice_checkpoint)
+            print(f"saved best-Dice checkpoint: {dice_checkpoint}")
 
 
 if __name__ == "__main__":

@@ -3,16 +3,29 @@ from torch import nn
 
 
 class BCEDiceLoss(nn.Module):
-    def __init__(self, smooth: float = 1.0) -> None:
+    def __init__(
+        self,
+        smooth: float = 1.0,
+        dice_on_positive_masks_only: bool = False,
+    ) -> None:
         super().__init__()
         self.bce = nn.BCEWithLogitsLoss()
         self.smooth = smooth
+        self.dice_on_positive_masks_only = dice_on_positive_masks_only
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         bce_loss = self.bce(logits, targets)
 
         probabilities = torch.sigmoid(logits)
         dimensions = (1, 2, 3)
+
+        if self.dice_on_positive_masks_only:
+            positive_masks = targets.sum(dim=dimensions) > 0
+            if not bool(positive_masks.any()):
+                return bce_loss
+            probabilities = probabilities[positive_masks]
+            targets = targets[positive_masks]
+
         intersection = (probabilities * targets).sum(dim=dimensions)
         denominator = probabilities.sum(dim=dimensions) + targets.sum(dim=dimensions)
         dice = (2 * intersection + self.smooth) / (denominator + self.smooth)
@@ -87,6 +100,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     threshold: float = 0.5,
+    non_blocking: bool = False,
 ) -> dict[str, float | int]:
     model.train()
 
@@ -95,8 +109,8 @@ def train_one_epoch(
     tp = tn = fp = fn = 0
 
     for images, masks, _ in loader:
-        images = images.to(device)
-        masks = masks.to(device)
+        images = images.to(device, non_blocking=non_blocking)
+        masks = masks.to(device, non_blocking=non_blocking)
 
         optimizer.zero_grad()
 
@@ -127,6 +141,7 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
     threshold: float = 0.5,
+    non_blocking: bool = False,
 ) -> dict[str, float | int]:
     model.eval()
 
@@ -136,8 +151,8 @@ def evaluate(
 
     with torch.no_grad():
         for images, masks, _ in loader:
-            images = images.to(device)
-            masks = masks.to(device)
+            images = images.to(device, non_blocking=non_blocking)
+            masks = masks.to(device, non_blocking=non_blocking)
 
             logits = model(images)
             loss = criterion(logits, masks)
