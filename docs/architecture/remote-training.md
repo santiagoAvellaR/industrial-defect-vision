@@ -106,21 +106,22 @@ pin_memory=False
 
 When `--pin-memory` is enabled on CUDA, host tensors are pinned and training/evaluation use non-blocking device transfers.
 
-These are runtime-performance controls. Changing them for benchmarking does not automatically define a new ML experiment.
+`num_workers` and pinned-memory settings are infrastructure/runtime controls. `batch_size` is different: it also changes optimization dynamics because it changes how many samples contribute to each optimizer update.
 
 ## Infrastructure benchmark
 
-Before the next expensive experiment, benchmark short disposable runs using `/tmp/ksdd2`.
+Before the next expensive experiment, benchmark short disposable runs using `/tmp/ksdd2` while keeping `batch_size=4` fixed.
 
-Suggested first values:
+Recommended sequence:
 
 ```text
-batch_size:   4, 8, 16
-num_workers:  0, 2, 4
-pin_memory:   off/on
+A. num_workers=0, pin_memory=off   <- baseline
+B. num_workers=2, pin_memory=off
+C. num_workers=4, pin_memory=off
+D. best worker count, pin_memory=on
 ```
 
-Do not exhaustively run every combination unless needed. Start from the validated baseline and change one infrastructure variable at a time.
+This isolates DataLoader/transfer performance without changing the mathematical batch size used in EXP-013.
 
 Example:
 
@@ -142,11 +143,16 @@ Record at least:
 - wall-clock time;
 - GPU utilization from `nvidia-smi` while the run is active;
 - observed/peak VRAM;
-- batch size;
 - worker count;
 - pin-memory setting.
 
-Metrics from these disposable runs are not used to compare model quality when `batch_size` changes, because batch size can alter optimization dynamics.
+The resulting model metrics are not an experiment result; these runs exist only to measure infrastructure performance.
+
+### Batch-size benchmarking
+
+Only consider `batch_size=8` or `16` after the DataLoader benchmark if GPU utilization or VRAM measurements suggest substantial unused capacity.
+
+Because batch size can change optimization behavior, adopting a different batch size for future model training should be treated as an explicit experimental choice rather than a transparent infrastructure optimization.
 
 ## Running a real experiment
 
