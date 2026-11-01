@@ -213,8 +213,9 @@ def main() -> None:
             generator.set_state(resume_checkpoint["data_loader_generator_state"])
         if "torch_rng_state" in resume_checkpoint:
             torch.set_rng_state(resume_checkpoint["torch_rng_state"])
-        if device.type == "cuda" and "cuda_rng_state_all" in resume_checkpoint:
-            torch.cuda.set_rng_state_all(resume_checkpoint["cuda_rng_state_all"])
+        cuda_rng_state_all = resume_checkpoint.get("cuda_rng_state_all")
+        if device.type == "cuda" and cuda_rng_state_all is not None:
+            torch.cuda.set_rng_state_all(cuda_rng_state_all)
 
         print(f"resuming from: {args.resume}")
         print(f"resume checkpoint epoch: {resume_checkpoint['epoch']}")
