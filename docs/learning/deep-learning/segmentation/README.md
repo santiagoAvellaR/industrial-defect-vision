@@ -10,7 +10,9 @@ This section records the concepts used from M4 onward, where the project moves f
 4. [Pixel imbalance, IoU and Dice](topics/pixel-imbalance-iou-and-dice.md) — why pixel accuracy is misleading and how overlap metrics evaluate defect masks.
 5. [Simple U-Net forward pass](topics/simple-unet-forward-pass.md) — the first implemented M4 model, followed tensor by tensor through encoder, bottleneck, decoder and skips.
 6. [Segmentation losses](topics/segmentation-losses.md) — plain BCE, weighted BCE, soft Dice loss and why the first baseline uses BCE + Dice.
-7. [DeepLabV3-ResNet50](topics/deeplabv3-resnet50.md) — pretrained ResNet50 features, atrous convolutions, ASPP, the binary segmentation head and the comparison against SimpleUNet.
+7. [Atrous / dilated convolution](topics/atrous-convolution.md) — how dilation enlarges receptive field without increasing the learned kernel size.
+8. [Atrous Spatial Pyramid Pooling (ASPP)](topics/aspp.md) — how DeepLab combines local, dilated and global context at several spatial scales.
+9. [DeepLabV3-ResNet50](topics/deeplabv3-resnet50.md) — pretrained ResNet50 features, ASPP, the binary segmentation head and the comparison against SimpleUNet.
 
 For a cross-project visual summary of every architecture studied so far, see the [architecture atlas](../architectures/README.md).
 
@@ -74,6 +76,8 @@ By the end of M4/M5, we should be able to answer:
 - Can we follow the implemented U-Net shapes through every encoder and decoder stage?
 - What does a ResNet50 backbone contribute to DeepLabV3?
 - What are atrous/dilated convolutions?
+- How does dilation change receptive field without increasing the learned kernel size?
 - What is ASPP and why does multi-scale context help segmentation?
+- How is ASPP different from U-Net skip connections?
 - Why does a pretrained model require matching input normalization?
 - Why can a larger pretrained model still fail to beat a smaller scratch baseline?
