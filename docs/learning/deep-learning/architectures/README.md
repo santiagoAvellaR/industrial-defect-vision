@@ -1,38 +1,37 @@
 # Architecture atlas
 
-This note is the visual map of the neural-network architectures studied in the project.
+This is the visual map of the neural-network architectures studied and used in the project.
 
-Its purpose is not to duplicate every detailed topic note. It gives one place to answer:
+The detailed notes explain each concept; this page answers at a glance:
 
-- What kind of model is this?
-- What are its main parts?
-- What does each part do?
-- What output does it produce?
-- Where is the detailed explanation?
+- what the architecture is;
+- what task it performs;
+- what its main modules are;
+- what tensor it produces;
+- how it relates to the previous model.
 
-## Architecture versus layer
+## Architecture versus layer versus backbone
 
-A **layer** is one operation or parameterized transformation, such as `Conv2d`, `Linear`, `BatchNorm2d`, `ReLU` or `MaxPool2d`.
+A **layer** is one operation such as `Conv2d`, `BatchNorm2d`, `ReLU`, `MaxPool2d` or `Linear`.
 
-An **architecture** is the larger organization of many layers and connections into a complete model.
+An **architecture** is the organization of many layers and connections into a complete model.
 
-Examples in this project:
+A **backbone** is the feature-extraction subnetwork inside a larger model.
 
-- `BaselineCNN` is a small classification architecture built from convolution, activation, pooling and a linear classifier;
-- ResNet18 is a deeper classification architecture built around residual blocks;
-- U-Net is an encoder-decoder segmentation architecture built around encoder-to-decoder skip connections.
+Detailed notes:
 
-A training regime such as **frozen ResNet18** or **partially fine-tuned ResNet18** changes which parameters are trained, but it does not create a different underlying ResNet18 architecture.
+- [Backbones](topics/backbones.md)
+- [ResNet family](topics/resnet-family.md)
 
 ---
 
-## 1. BaselineCNN — scratch image classifier
+# 1. BaselineCNN — scratch image classifier
 
-### Purpose
+## Goal
 
 Binary image-level classification:
 
-> Does this complete image contain a defect?
+> Does this image contain a defect?
 
 Output:
 
@@ -40,305 +39,251 @@ Output:
 [B]
 ```
 
-One logit per image.
+one logit per image.
 
-### Project implementation
+## Diagram
+
+```mermaid
+flowchart LR
+    A[RGB image<br/>B×3×640×224] --> B[Conv 3→16 + ReLU]
+    B --> C[MaxPool]
+    C --> D[Conv 16→32 + ReLU]
+    D --> E[MaxPool]
+    E --> F[Conv 32→64 + ReLU]
+    F --> G[MaxPool]
+    G --> H[Global pooling]
+    H --> I[Linear → 1]
+    I --> J[Image logit]
+```
+
+## Main lesson
+
+A deliberately small CNN trained from random initialization. It made convolution, pooling, global pooling, logits, BCE and the training loop understandable before transfer learning.
+
+Implementation:
 
 `src/industrial_vision/models/baseline_cnn.py`
 
-### Main architecture
-
-```mermaid
-flowchart TD
-    A[Input<br/>B × 3 × 640 × 224]
-    B[Conv 3→16]
-    C[ReLU]
-    D[MaxPool<br/>320 × 112]
-    E[Conv 16→32]
-    F[ReLU]
-    G[MaxPool<br/>160 × 56]
-    H[Conv 32→64]
-    I[ReLU]
-    J[MaxPool<br/>80 × 28]
-    K[Global pooling]
-    L[Linear → 1]
-    M[One logit per image]
-
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L --> M
-```
-
-### Parts
-
-**Convolutions**
-
-Learn feature maps from local image patterns.
-
-**ReLU**
-
-Introduces non-linearity.
-
-**MaxPool**
-
-Reduces spatial resolution while keeping channel count unchanged.
-
-**Global pooling**
-
-Collapses the final spatial grid into one feature vector for the whole image.
-
-The project tested:
-
-- global average pooling, GAP;
-- global max pooling, GMP;
-- concatenated GAP + GMP.
-
-**Linear classifier**
-
-Converts the final feature vector into one binary-classification logit.
-
-### Main lesson
-
-This model is deliberately small and trained from random initialization so every part of the classification pipeline can be understood before transfer learning.
-
-Detailed notes:
-
-- [`../cnn/README.md`](../cnn/README.md)
-- [`../cnn/topics/convolution.md`](../cnn/topics/convolution.md)
-- [`../cnn/topics/pooling.md`](../cnn/topics/pooling.md)
-- [`../cnn/topics/classifier-and-loss.md`](../cnn/topics/classifier-and-loss.md)
-
 ---
 
-## 2. ResNet18 — residual image classifier
+# 2. ResNet18 — pretrained residual classifier
 
-### Purpose in this project
+## Goal
 
-Binary image-level classification using a pretrained visual backbone.
+Image-level classification using a pretrained visual backbone.
 
-Output after adapting the classifier:
-
-```text
-[B]
+```mermaid
+flowchart LR
+    A[Image] --> B[Stem<br/>Conv + BN + ReLU + Pool]
+    B --> C[layer1]
+    C --> D[layer2]
+    D --> E[layer3]
+    E --> F[layer4]
+    F --> G[Global average pooling]
+    G --> H[512-D vector]
+    H --> I[Binary classifier]
+    I --> J[Image logit]
 ```
 
-One logit per image.
+## Residual block
 
-### Project implementation
+```mermaid
+flowchart LR
+    X[Input x] --> F[Learned transformation F(x)]
+    X --> S[Shortcut]
+    F --> A[Add]
+    S --> A
+    A --> O[H(x)=F(x)+x]
+```
+
+ResNet18 uses `BasicBlock` residual units and has about **11.69M parameters** in its standard ImageNet classifier form.
+
+Project use:
+
+- EXP-008: pretrained backbone frozen;
+- EXP-009: `layer4` partially fine-tuned.
+
+Implementation:
 
 `src/industrial_vision/models/resnet18_classifier.py`
 
-### High-level architecture
+For the complete canonical family (`18/34/50/101/152`), block types, stage repeats, parameters and feature-map dimensions, see [ResNet family](topics/resnet-family.md).
+
+---
+
+# 3. Canonical ResNet family
 
 ```mermaid
 flowchart TD
-    A[Input image] --> B[Stem<br/>Conv + BN + ReLU + MaxPool]
-    B --> C[layer1<br/>residual blocks]
-    C --> D[layer2<br/>residual blocks]
-    D --> E[layer3<br/>residual blocks]
-    E --> F[layer4<br/>residual blocks]
-    F --> G[Adaptive global average pooling]
-    G --> H[512 features]
-    H --> I[Linear 512→1]
-    I --> J[One logit per image]
+    R[Residual Networks] --> R18[ResNet18<br/>BasicBlock<br/>11.69M params]
+    R --> R34[ResNet34<br/>BasicBlock<br/>21.80M params]
+    R --> R50[ResNet50<br/>Bottleneck<br/>25.56M params]
+    R --> R101[ResNet101<br/>Bottleneck<br/>44.55M params]
+    R --> R152[ResNet152<br/>Bottleneck<br/>60.19M params]
 ```
 
-For the project input size, the approximate feature progression is:
+| Model | Block | Stage repeats | Standard classifier params |
+|---|---|---|---:|
+| ResNet18 | BasicBlock | `[2,2,2,2]` | 11,689,512 |
+| ResNet34 | BasicBlock | `[3,4,6,3]` | 21,797,672 |
+| ResNet50 | Bottleneck | `[3,4,6,3]` | 25,557,032 |
+| ResNet101 | Bottleneck | `[3,4,23,3]` | 44,549,160 |
+| ResNet152 | Bottleneck | `[3,8,36,3]` | 60,192,808 |
 
-```text
-[B, 3,   640,224]
-      ↓
-[B, 64,  160, 56]
-      ↓
-[B,128,   80, 28]
-      ↓
-[B,256,   40, 14]
-      ↓
-[B,512,   20,  7]
-      ↓ global average pooling
-[B,512]
-      ↓ classifier
-[B]
-```
-
-### Residual block
-
-The defining ResNet idea is a shortcut around a learned transformation:
-
-```mermaid
-flowchart LR
-    X[Input x] --> C1[Conv + BN + ReLU]
-    C1 --> C2[Conv + BN]
-    X --> S[Residual skip path]
-    C2 --> A[Add]
-    S --> A
-    A --> R[ReLU]
-```
-
-Conceptually:
-
-```math
-H(x)=F(x)+x
-```
-
-The convolutional branch learns a residual correction `F(x)` while the skip gives the representation a direct path through the block.
-
-### Frozen versus fine-tuned ResNet18
-
-These are **training regimes**, not different architectures.
-
-Frozen:
-
-```text
-backbone weights -> fixed
-new classifier   -> trainable
-```
-
-Partial fine-tuning used in EXP-009:
-
-```text
-conv1/layer1/layer2/layer3 -> frozen
-layer4                     -> trainable
-classifier                 -> trainable
-```
-
-### Main lesson
-
-Pretrained features were not sufficiently aligned with the industrial domain when completely frozen. Partial fine-tuning of `layer4` adapted the deeper representation and strongly improved the precision-recall trade-off.
-
-Detailed notes:
-
-- [`../transfer-learning/README.md`](../transfer-learning/README.md)
-- [`../transfer-learning/topics/resnet-and-residual-blocks.md`](../transfer-learning/topics/resnet-and-residual-blocks.md)
-- [`../transfer-learning/topics/pretraining-and-freezing.md`](../transfer-learning/topics/pretraining-and-freezing.md)
-- [`../transfer-learning/topics/fine-tuning.md`](../transfer-learning/topics/fine-tuning.md)
+The project directly uses ResNet18 for classification and ResNet50 as the backbone inside DeepLabV3.
 
 ---
 
-## 3. Encoder-decoder — general architecture pattern
+# 4. SimpleUNet — scratch semantic segmentation
 
-Encoder-decoder is a **general pattern**, not one exact network definition.
+## Goal
 
-The encoder progressively transforms the input into lower-resolution, more contextual features.
+Pixel-level defect localization.
 
-The decoder transforms that deep representation back into a high-resolution output.
-
-```mermaid
-flowchart LR
-    A[Input] --> B[Encoder]
-    B --> C[Bottleneck]
-    C --> D[Decoder]
-    D --> E[Dense output]
-```
-
-Many segmentation architectures are encoder-decoder models.
-
-U-Net is one specific and famous example.
-
----
-
-## 4. U-Net — semantic-segmentation architecture
-
-### Purpose
-
-Dense pixel-level prediction:
-
-> Which pixels belong to the defect?
-
-Binary-segmentation output:
+Output:
 
 ```text
-[B, 1, H, W]
+[B,1,H,W]
 ```
 
-One defect logit at every spatial position.
+one defect logit per pixel.
 
-### Project status
-
-U-Net is the M4 architecture currently being studied before implementation.
-
-### Main architecture
+## Diagram
 
 ```mermaid
 flowchart TD
-    I[Input image] --> E1[Encoder stage 1]
-    E1 --> E2[Encoder stage 2]
-    E2 --> E3[Encoder stage 3]
-    E3 --> B[Bottleneck]
+    I[Image] --> E1[Encoder 16 ch]
+    E1 --> P1[Pool]
+    P1 --> E2[Encoder 32 ch]
+    E2 --> P2[Pool]
+    P2 --> E3[Encoder 64 ch]
+    E3 --> P3[Pool]
+    P3 --> B[Bottleneck 128 ch]
 
-    B --> D3[Decoder stage 3]
-    D3 --> D2[Decoder stage 2]
-    D2 --> D1[Decoder stage 1]
-    D1 --> O[Pixel logits]
+    B --> D3[Upsample + decoder]
+    D3 --> D2[Upsample + decoder]
+    D2 --> D1[Upsample + decoder]
+    D1 --> O[1×1 Conv → pixel logits]
 
-    E3 -. skip features .-> D3
-    E2 -. skip features .-> D2
-    E1 -. skip features .-> D1
+    E3 -. skip .-> D3
+    E2 -. skip .-> D2
+    E1 -. skip .-> D1
 ```
 
-### Parts
+## Structural idea
 
-**Encoder**
+The encoder builds context by reducing spatial resolution. The decoder reconstructs a dense output. U-Net skip connections copy high-resolution encoder features into the decoder to recover localization detail.
 
-A subnetwork made of convolution/downsampling blocks. It learns increasingly contextual features while reducing spatial resolution.
+Implementation:
 
-**Bottleneck**
+`src/industrial_vision/models/simple_unet.py`
 
-The deepest spatially compressed representation between encoder and decoder.
-
-**Decoder**
-
-A subnetwork that increases spatial resolution again so a full-resolution prediction can be produced.
-
-**U-Net skip connections**
-
-Earlier encoder feature maps are copied to decoder stages with matching spatial resolution, typically by concatenation.
-
-Their main role is to reintroduce fine localization information that would be difficult to reconstruct from the bottleneck alone.
-
-**Final pixel classifier**
-
-A common binary-segmentation final layer is:
-
-```python
-nn.Conv2d(C, 1, kernel_size=1)
-```
-
-It converts the `C` decoder feature channels at every spatial position into one defect logit.
-
-### ResNet skip versus U-Net skip
-
-They share the general idea of bypassing intermediate layers, but their purpose and combination are different.
-
-| Architecture | Typical combination | Main purpose |
-| --- | --- | --- |
-| ResNet | addition | optimization and residual information flow |
-| U-Net | concatenation | restore spatial/localization detail |
-
-Detailed notes:
-
-- [`../segmentation/README.md`](../segmentation/README.md)
-- [`../segmentation/topics/encoder-decoder-and-unet.md`](../segmentation/topics/encoder-decoder-and-unet.md)
-- [`../segmentation/topics/pixel-logits.md`](../segmentation/topics/pixel-logits.md)
+This is the M4 segmentation baseline used in EXP-010 through EXP-013.
 
 ---
 
-## Comparison at a glance
+# 5. DeepLabV3-ResNet50 — pretrained semantic segmentation
 
-| Architecture | Main task here | Output | Core structural idea |
-| --- | --- | --- | --- |
-| BaselineCNN | classification | `[B]` | simple Conv/ReLU/Pool feature extractor + global pooling |
-| ResNet18 | classification | `[B]` | residual blocks and pretrained backbone |
-| Encoder-decoder | dense prediction pattern | spatial output | compress context, then recover resolution |
-| U-Net | segmentation | `[B,1,H,W]` | encoder-decoder plus matching-resolution skip connections |
+## Goal
 
-## Why the project studies them in this order
+The same binary pixel-level task as SimpleUNet, but using a modern pretrained model family.
 
 ```mermaid
 flowchart LR
-    A[Small scratch CNN] --> B[Understand CNN fundamentals]
+    A[RGB image] --> B[ImageNet normalization]
+    B --> C[ResNet50 backbone]
+    C --> D[Deep feature map]
+    D --> E[ASPP<br/>multi-scale atrous context]
+    E --> F[DeepLab classifier]
+    F --> G[1 defect logit / pixel]
+    G --> H[Upsample to input size]
+```
+
+## Internal mental model
+
+```mermaid
+flowchart TD
+    F[ResNet50 deep features] --> A1[1×1 conv]
+    F --> A2[3×3 atrous conv r=12]
+    F --> A3[3×3 atrous conv r=24]
+    F --> A4[3×3 atrous conv r=36]
+    F --> A5[Global pooling branch]
+    A1 --> C[Concatenate + projection]
+    A2 --> C
+    A3 --> C
+    A4 --> C
+    A5 --> C
+    C --> O[Binary segmentation logits]
+```
+
+## What is new compared with SimpleUNet?
+
+| SimpleUNet | DeepLabV3-ResNet50 |
+|---|---|
+| scratch training | pretrained initialization |
+| small custom encoder | ResNet50 backbone |
+| symmetric encoder-decoder | no symmetric U-Net decoder |
+| encoder-decoder skip connections | ASPP multiscale context |
+| ordinary convolutions | atrous/dilated convolutions in ASPP |
+| no BatchNorm | BatchNorm throughout ResNet/ASPP |
+| input `[0,1]` | ImageNet normalization |
+| relatively light | much larger compute/VRAM cost |
+
+Implementation:
+
+`src/industrial_vision/models/deeplabv3.py`
+
+Training:
+
+`scripts/train_deeplabv3.py`
+
+Detailed notes:
+
+- [`../segmentation/topics/deeplabv3-resnet50.md`](../segmentation/topics/deeplabv3-resnet50.md)
+- [`../segmentation/topics/atrous-convolution.md`](../segmentation/topics/atrous-convolution.md)
+- [`../segmentation/topics/aspp.md`](../segmentation/topics/aspp.md)
+
+---
+
+# Output contract across the project
+
+```mermaid
+flowchart TD
+    A[Image-level models] --> A1[BaselineCNN]
+    A --> A2[ResNet18]
+    A1 --> AO[Output B<br/>one logit/image]
+    A2 --> AO
+
+    B[Pixel-level models] --> B1[SimpleUNet]
+    B --> B2[DeepLabV3-ResNet50]
+    B1 --> BO[Output B×1×H×W<br/>one logit/pixel]
+    B2 --> BO
+```
+
+The important software-design choice is that both segmentation architectures expose the same output contract. Therefore the project can reuse:
+
+- `BCEDiceLoss`;
+- `train_one_epoch`;
+- `evaluate`;
+- segmentation metrics;
+- threshold sweep;
+- qualitative prediction tooling.
+
+The model changes while the evaluation contract stays stable.
+
+---
+
+# Progression of architectural ideas
+
+```mermaid
+flowchart LR
+    A[BaselineCNN] --> B[Learn CNN fundamentals]
     B --> C[ResNet18]
-    C --> D[Understand transfer learning and residual networks]
-    D --> E[U-Net]
-    E --> F[Understand dense prediction and localization]
+    C --> D[Residual learning + transfer learning]
+    D --> E[SimpleUNet]
+    E --> F[Dense prediction + encoder/decoder skips]
+    F --> G[DeepLabV3-ResNet50]
+    G --> H[Pretrained segmentation + atrous multi-scale context]
 ```
 
-The order is deliberate: each architecture reuses concepts already learned and introduces only a small number of new structural ideas.
+This order is intentional: each step introduces a limited number of new ideas while reusing the training/evaluation knowledge learned earlier.
