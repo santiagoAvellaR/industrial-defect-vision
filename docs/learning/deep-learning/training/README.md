@@ -14,6 +14,7 @@ These notes cover the part of the project that turns a forward pass and a scalar
 8. [Classification threshold](topics/classification-threshold.md) — how a probability becomes a class decision and why threshold choice trades precision against recall.
 9. [Error analysis](topics/error-analysis.md) — inspect FP/FN examples, score overlap and defect size before choosing the next model change.
 10. [GPU runtime, CUDA OOM, smoke tests and BatchNorm constraints](topics/gpu-runtime-smoke-tests-and-batchnorm.md) — GPU vs CUDA, VRAM, smoke tests, singleton BatchNorm failure and why EXP-014 uses `drop_last=True` for training.
+11. [Checkpoints and resumable training](topics/checkpoints-and-resuming.md) — best versus latest checkpoints, optimizer/RNG state and how to recover interrupted GPU experiments.
 
 ## Training boundary
 
@@ -38,7 +39,8 @@ The important separation is:
 - gradients are cleared before the next standard training step so batches do not unintentionally accumulate into one another;
 - validation observes the model without updating it;
 - epoch metrics summarize behavior over all samples rather than one batch;
-- runtime checks such as smoke tests verify that the whole pipeline is operational before committing to expensive training.
+- runtime checks such as smoke tests verify that the whole pipeline is operational before committing to expensive training;
+- best checkpoints support model selection, while latest checkpoints support interruption recovery.
 
 ## Current implementation
 
@@ -61,6 +63,8 @@ SimpleUNet segmentation training:
 DeepLabV3 segmentation training:
 
 `scripts/train_deeplabv3.py`
+
+The DeepLab script supports `--latest-checkpoint` and `--resume` so a remote GPU interruption does not require starting a long experiment from zero.
 
 Remote GPU workflow:
 
