@@ -99,9 +99,60 @@ One-epoch validation metrics at threshold `0.5`:
 - precision: `0.5678`;
 - recall: `0.3445`.
 
-These values are **not the final EXP-014 result**. The smoke run is disposable and exists to validate the pipeline before the controlled 20-epoch experiment. The fact that one epoch already reaches a Dice near the EXP-013 best checkpoint is encouraging but should not be used to select the final model.
+These values are **not the final EXP-014 result**. The smoke run is disposable and exists to validate the pipeline before the controlled 20-epoch experiment.
 
-## Run command
+## First full-run attempt and interruption
+
+The first real 20-epoch Colab run completed epochs 1 through 7 and then stopped because the remote execution was interrupted. The persisted training log contains no Python traceback after epoch 7, so this is treated as a runtime interruption rather than a model/training exception.
+
+Validation history before the interruption:
+
+| Epoch | Val loss | Dice | IoU | Precision | Recall |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.2425 | 0.4288 | 0.2729 | 0.5131 | 0.3683 |
+| 2 | 0.1944 | 0.3529 | 0.2142 | 0.3053 | 0.4181 |
+| 3 | 0.2163 | 0.4283 | 0.2725 | 0.7582 | 0.2984 |
+| 4 | 0.2960 | 0.2725 | 0.1577 | 0.4500 | 0.1954 |
+| **5** | **0.1922** | **0.4634** | **0.3016** | **0.7273** | **0.3400** |
+| 6 | 0.2926 | 0.3360 | 0.2019 | 0.5964 | 0.2339 |
+| 7 | 0.2166 | 0.3888 | 0.2413 | 0.4001 | 0.3781 |
+
+The best persisted checkpoint is epoch 5, which is both the lowest-loss and highest-Dice checkpoint from the interrupted segment.
+
+At this point DeepLabV3 has already exceeded the EXP-013 baseline Dice at threshold `0.5`:
+
+```text
+EXP-013 SimpleUNet best Dice = 0.4201
+EXP-014 epoch 5 Dice         = 0.4634
+```
+
+This is encouraging but still not the final experiment result because the planned 20-epoch budget and post-training threshold sweep have not been completed.
+
+## Resume policy added after the interruption
+
+The training script now supports:
+
+```text
+--latest-checkpoint
+--resume
+```
+
+A latest checkpoint is saved after every completed epoch for interruption recovery, separately from best-loss and best-Dice checkpoints used for model selection.
+
+The latest checkpoint records:
+
+- model state;
+- Adam optimizer state;
+- epoch;
+- best validation loss/Dice seen so far;
+- experiment configuration;
+- DataLoader generator state;
+- PyTorch RNG state;
+- CUDA RNG state.
+
+For this already-interrupted run, the best persisted epoch-5 checkpoint predates that latest/RNG-state feature. Recovery therefore resumes model + optimizer state from epoch 5 and repeats epochs 6 onward. The exact random trajectory after epoch 5 cannot be guaranteed to match the original interrupted attempt, so this fact is explicitly documented.
+
+## Fresh-run command
 
 ```bash
 python scripts/train_deeplabv3.py /content/ksdd2 \
@@ -113,8 +164,30 @@ python scripts/train_deeplabv3.py /content/ksdd2 \
   --threshold 0.5 \
   --dice-positive-only \
   --checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_loss.pt \
-  --dice-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt
+  --dice-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt \
+  --latest-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_latest.pt
 ```
+
+## Resume command for the interrupted run
+
+Resume from the persisted epoch-5 best-Dice checkpoint and train through total epoch 20:
+
+```bash
+python scripts/train_deeplabv3.py /content/ksdd2 \
+  --epochs 20 \
+  --batch-size 4 \
+  --num-workers 2 \
+  --pin-memory \
+  --learning-rate 3e-4 \
+  --threshold 0.5 \
+  --dice-positive-only \
+  --checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_loss.pt \
+  --dice-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt \
+  --latest-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_latest.pt \
+  --resume artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt
+```
+
+`--epochs 20` means a total target of 20 epochs, not 20 additional epochs. An epoch-5 checkpoint therefore resumes at epoch 6.
 
 ## Evaluation after training
 
@@ -125,15 +198,17 @@ python scripts/train_deeplabv3.py /content/ksdd2 \
 
 ## Results
 
-Pending full 20-epoch training.
+Partial result before interruption: best validation Dice `0.4634` at epoch 5, threshold `0.5`.
+
+Final result pending completion of the resumed 20-epoch training and threshold sweep.
 
 ## Interpretation
 
-Pending full 20-epoch training.
+The pretrained model is already competitive very early, but validation metrics oscillate substantially across epochs. This reinforces the need for best-checkpoint selection and makes a complete run preferable to choosing an early epoch manually.
 
 ## Conclusion
 
-Pending full 20-epoch training.
+Pending full resumed training.
 
 ## MLflow run
 
