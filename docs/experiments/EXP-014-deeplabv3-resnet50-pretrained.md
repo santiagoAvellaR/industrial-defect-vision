@@ -26,13 +26,14 @@ Keep the successful EXP-013 training setup wherever it remains meaningful:
 - Augmentation: none
 - Optimizer: Adam
 - LR: `3e-4`
-- Batch size: 4, subject to the GPU smoke test fitting in memory
+- Batch size: 4
 - Loss: BCE on all images + soft Dice only on non-empty target masks
 - Epochs: 20
 - Evaluation threshold during training: 0.5
 - Checkpoints: lowest validation loss and highest validation Dice
 - Runtime target: Google Colab GPU
 - DataLoader runtime: `num_workers=2`, `pin_memory=True`
+- DeepLab training loader: `drop_last=True` to prevent a final singleton batch from entering BatchNorm; validation keeps every sample
 
 ## Controlled comparison with EXP-013
 
@@ -45,7 +46,7 @@ Held constant:
 - BCE + positive-mask-only Dice objective;
 - Adam optimizer;
 - learning rate;
-- batch size if memory allows;
+- batch size;
 - epoch budget;
 - validation metrics;
 - checkpoint selection rules;
@@ -54,9 +55,10 @@ Held constant:
 Changed as one model package:
 
 - SimpleUNet trained from scratch -> pretrained DeepLabV3-ResNet50;
-- unnormalized input -> ImageNet normalization expected by the pretrained model.
+- unnormalized input -> ImageNet normalization expected by the pretrained model;
+- DeepLab training uses `drop_last=True` because its ASPP BatchNorm cannot train on a final batch containing only one image.
 
-The preprocessing difference is intentional and is part of using the pretrained representation correctly, so this is a controlled model-family comparison rather than a strict one-variable ablation.
+The preprocessing difference is intentional and is part of using the pretrained representation correctly, so this is a controlled model-family comparison rather than a strict one-variable ablation. `drop_last=True` is an architecture/runtime requirement rather than a modeling hypothesis; the number of omitted training samples per epoch is recorded in the checkpoint.
 
 ## Baseline to beat
 
@@ -67,6 +69,16 @@ EXP-013 best validation-Dice checkpoint at threshold `0.5`:
 - Precision: `0.6702`
 - Recall: `0.3060`
 - Epoch: 17
+
+## First GPU smoke test
+
+The first Colab smoke test confirmed that batch size 4 fits on the Tesla T4 and the pretrained weights load correctly. The run failed near the end of the training epoch, not because of CUDA memory, but because the final training batch contained one image.
+
+DeepLabV3's ASPP pooling branch produces a `1 x 1` feature map followed by BatchNorm. With a singleton batch the tensor shape was `[1, 256, 1, 1]`, giving BatchNorm only one value per channel and triggering:
+
+`ValueError: Expected more than 1 value per channel when training`
+
+Fix: the DeepLab training DataLoader now uses `drop_last=True`. The validation DataLoader remains unchanged and evaluates the complete validation set.
 
 ## Run command
 
@@ -83,7 +95,7 @@ python scripts/train_deeplabv3.py /content/ksdd2 \
   --dice-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt
 ```
 
-Before the full run, execute a one-epoch GPU smoke test with the same batch size. If batch size 4 causes CUDA OOM, record that infrastructure constraint before changing batch size because batch size can affect optimization.
+Before the full run, repeat the one-epoch GPU smoke test after the `drop_last=True` fix.
 
 ## Evaluation after training
 
