@@ -60,6 +60,10 @@ def main() -> None:
     args = parse_args()
     if args.num_workers < 0:
         raise ValueError("--num-workers must be >= 0")
+    if args.batch_size < 2:
+        raise ValueError(
+            "--batch-size must be >= 2 for DeepLabV3 BatchNorm during training"
+        )
 
     torch.manual_seed(args.seed)
 
@@ -86,7 +90,8 @@ def main() -> None:
     print(f"threshold: {args.threshold}")
     print(
         f"data loader: batch_size={args.batch_size} "
-        f"num_workers={args.num_workers} pin_memory={pin_memory}"
+        f"num_workers={args.num_workers} pin_memory={pin_memory} "
+        "train_drop_last=True"
     )
 
     train_dataset = KSDD2Dataset(
@@ -100,6 +105,9 @@ def main() -> None:
         imagenet_normalize=True,
     )
 
+    dropped_train_samples = len(train_dataset) % args.batch_size
+    print(f"train samples dropped per epoch: {dropped_train_samples}")
+
     generator = torch.Generator().manual_seed(args.seed)
     loader_kwargs = {
         "batch_size": args.batch_size,
@@ -110,6 +118,7 @@ def main() -> None:
         train_dataset,
         shuffle=True,
         generator=generator,
+        drop_last=True,
         **loader_kwargs,
     )
     val_loader = DataLoader(val_dataset, shuffle=False, **loader_kwargs)
@@ -161,6 +170,8 @@ def main() -> None:
             "learning_rate": args.learning_rate,
             "num_workers": args.num_workers,
             "pin_memory": pin_memory,
+            "train_drop_last": True,
+            "dropped_train_samples_per_epoch": dropped_train_samples,
             "device_type": device.type,
             "device_name": device_name,
             "pretrained": True,
