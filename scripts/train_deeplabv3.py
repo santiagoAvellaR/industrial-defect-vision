@@ -41,6 +41,18 @@ def parse_args() -> argparse.Namespace:
         default=Path("artifacts/checkpoints/deeplabv3_resnet50_best_dice.pt"),
         help="Checkpoint selected by highest validation Dice.",
     )
+    parser.add_argument(
+        "--latest-checkpoint",
+        type=Path,
+        default=None,
+        help="Optional checkpoint overwritten after every completed epoch for interruption recovery.",
+    )
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="Resume training from a compatible checkpoint. --epochs remains the total target epoch count.",
+    )
     return parser.parse_args()
 
 
@@ -56,6 +68,36 @@ def print_metrics(split: str, metrics: dict[str, float | int]) -> None:
     )
 
 
+def _validate_resume_checkpoint(
+    checkpoint: dict,
+    *,
+    batch_size: int,
+    learning_rate: float,
+    threshold: float,
+    seed: int,
+    dice_positive_only: bool,
+) -> None:
+    expected = {
+        "model_name": "deeplabv3_resnet50",
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "threshold": threshold,
+        "seed": seed,
+        "dice_on_positive_masks_only": dice_positive_only,
+        "imagenet_normalize": True,
+        "train_drop_last": True,
+    }
+    mismatches = []
+    for key, expected_value in expected.items():
+        actual_value = checkpoint.get(key)
+        if actual_value != expected_value:
+            mismatches.append(f"{key}: checkpoint={actual_value!r}, requested={expected_value!r}")
+
+    if mismatches:
+        details = "; ".join(mismatches)
+        raise ValueError(f"Resume checkpoint is not compatible with this run: {details}")
+
+
 def main() -> None:
     args = parse_args()
     if args.num_workers < 0:
@@ -64,6 +106,8 @@ def main() -> None:
         raise ValueError(
             "--batch-size must be >= 2 for DeepLabV3 BatchNorm during training"
         )
+    if args.epochs < 1:
+        raise ValueError("--epochs must be >= 1")
 
     torch.manual_seed(args.seed)
 
@@ -123,16 +167,64 @@ def main() -> None:
     )
     val_loader = DataLoader(val_dataset, shuffle=False, **loader_kwargs)
 
-    model = DeepLabV3ResNet50(weights=weights).to(device)
+    model_weights = None if args.resume is not None else weights
+    model = DeepLabV3ResNet50(weights=model_weights).to(device)
     criterion = BCEDiceLoss(dice_on_positive_masks_only=args.dice_positive_only)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
     best_val_loss = float("inf")
     best_val_dice = float("-inf")
+    start_epoch = 1
+
     args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
     args.dice_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    if args.latest_checkpoint is not None:
+        args.latest_checkpoint.parent.mkdir(parents=True, exist_ok=True)
 
-    for epoch in range(1, args.epochs + 1):
+    if args.resume is not None:
+        resume_checkpoint = torch.load(
+            args.resume,
+            map_location=device,
+            weights_only=False,
+        )
+        _validate_resume_checkpoint(
+            resume_checkpoint,
+            batch_size=args.batch_size,
+            learning_rate=args.learning_rate,
+            threshold=args.threshold,
+            seed=args.seed,
+            dice_positive_only=args.dice_positive_only,
+        )
+        model.load_state_dict(resume_checkpoint["model_state_dict"])
+        optimizer.load_state_dict(resume_checkpoint["optimizer_state_dict"])
+
+        start_epoch = int(resume_checkpoint["epoch"]) + 1
+        best_val_loss = float(
+            resume_checkpoint.get("best_val_loss", resume_checkpoint["val_loss"])
+        )
+        best_val_dice = float(
+            resume_checkpoint.get(
+                "best_val_dice",
+                resume_checkpoint["val_metrics"]["dice"],
+            )
+        )
+
+        if "data_loader_generator_state" in resume_checkpoint:
+            generator.set_state(resume_checkpoint["data_loader_generator_state"])
+        if "torch_rng_state" in resume_checkpoint:
+            torch.set_rng_state(resume_checkpoint["torch_rng_state"])
+        if device.type == "cuda" and "cuda_rng_state_all" in resume_checkpoint:
+            torch.cuda.set_rng_state_all(resume_checkpoint["cuda_rng_state_all"])
+
+        print(f"resuming from: {args.resume}")
+        print(f"resume checkpoint epoch: {resume_checkpoint['epoch']}")
+        print(f"next epoch: {start_epoch}/{args.epochs}")
+
+        if start_epoch > args.epochs:
+            print("Checkpoint already reached the requested total epoch count. Nothing to do.")
+            return
+
+    for epoch in range(start_epoch, args.epochs + 1):
         train_metrics = train_one_epoch(
             model,
             train_loader,
@@ -155,13 +247,25 @@ def main() -> None:
         print_metrics("train", train_metrics)
         print_metrics("val  ", val_metrics)
 
+        val_loss = float(val_metrics["loss"])
+        val_dice = float(val_metrics["dice"])
+        is_best_loss = val_loss < best_val_loss
+        is_best_dice = val_dice > best_val_dice
+
+        if is_best_loss:
+            best_val_loss = val_loss
+        if is_best_dice:
+            best_val_dice = val_dice
+
         checkpoint = {
             "epoch": epoch,
             "model_name": "deeplabv3_resnet50",
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
-            "val_loss": float(val_metrics["loss"]),
+            "val_loss": val_loss,
             "val_metrics": val_metrics,
+            "best_val_loss": best_val_loss,
+            "best_val_dice": best_val_dice,
             "loss_name": loss_name,
             "dice_on_positive_masks_only": args.dice_positive_only,
             "threshold": args.threshold,
@@ -177,17 +281,24 @@ def main() -> None:
             "pretrained": True,
             "pretrained_weights": weights_name,
             "imagenet_normalize": True,
+            "data_loader_generator_state": generator.get_state(),
+            "torch_rng_state": torch.get_rng_state(),
+            "cuda_rng_state_all": (
+                torch.cuda.get_rng_state_all() if device.type == "cuda" else None
+            ),
         }
 
-        if val_metrics["loss"] < best_val_loss:
-            best_val_loss = float(val_metrics["loss"])
+        if is_best_loss:
             torch.save(checkpoint, args.checkpoint)
             print(f"saved best-loss checkpoint: {args.checkpoint}")
 
-        if val_metrics["dice"] > best_val_dice:
-            best_val_dice = float(val_metrics["dice"])
+        if is_best_dice:
             torch.save(checkpoint, args.dice_checkpoint)
             print(f"saved best-Dice checkpoint: {args.dice_checkpoint}")
+
+        if args.latest_checkpoint is not None:
+            torch.save(checkpoint, args.latest_checkpoint)
+            print(f"saved latest checkpoint: {args.latest_checkpoint}")
 
 
 if __name__ == "__main__":
