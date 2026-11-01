@@ -80,6 +80,27 @@ DeepLabV3's ASPP pooling branch produces a `1 x 1` feature map followed by Batch
 
 Fix: the DeepLab training DataLoader now uses `drop_last=True`. The validation DataLoader remains unchanged and evaluates the complete validation set.
 
+## Second GPU smoke test
+
+After the `drop_last=True` fix, the one-epoch smoke test completed end to end on the Colab Tesla T4 with batch size 4, `num_workers=2` and pinned memory.
+
+Runtime evidence:
+
+- `train_drop_last=True`;
+- one training sample omitted in the incomplete final batch;
+- forward, loss, backward, optimizer step and validation all completed;
+- both best-loss and best-Dice smoke checkpoints were saved.
+
+One-epoch validation metrics at threshold `0.5`:
+
+- validation loss: `0.2223`;
+- Dice: `0.4288`;
+- IoU: `0.2729`;
+- precision: `0.5678`;
+- recall: `0.3445`.
+
+These values are **not the final EXP-014 result**. The smoke run is disposable and exists to validate the pipeline before the controlled 20-epoch experiment. The fact that one epoch already reaches a Dice near the EXP-013 best checkpoint is encouraging but should not be used to select the final model.
+
 ## Run command
 
 ```bash
@@ -95,8 +116,6 @@ python scripts/train_deeplabv3.py /content/ksdd2 \
   --dice-checkpoint artifacts/checkpoints/EXP-014-deeplabv3-resnet50-pretrained_best_dice.pt
 ```
 
-Before the full run, repeat the one-epoch GPU smoke test after the `drop_last=True` fix.
-
 ## Evaluation after training
 
 1. Compare the best-Dice checkpoint against EXP-013 at the common threshold `0.5`.
@@ -106,15 +125,15 @@ Before the full run, repeat the one-epoch GPU smoke test after the `drop_last=Tr
 
 ## Results
 
-Pending.
+Pending full 20-epoch training.
 
 ## Interpretation
 
-Pending.
+Pending full 20-epoch training.
 
 ## Conclusion
 
-Pending.
+Pending full 20-epoch training.
 
 ## MLflow run
 
