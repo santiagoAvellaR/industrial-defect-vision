@@ -10,20 +10,19 @@ The key idea is that a block does not need to learn the complete transformation 
 H(x)=F(x)+x
 ```
 
-```mermaid
-flowchart LR
-    X[Input x] --> C1[Convolutional path F(x)]
-    X --> S[Shortcut / identity path]
-    C1 --> A[Add]
-    S --> A
-    A --> O[Output H(x)]
-```
+![Residual block](https://upload.wikimedia.org/wikipedia/commons/b/ba/ResBlock.png)
+
+*Source: [Wikimedia Commons — ResBlock](https://commons.wikimedia.org/wiki/File:ResBlock.png), CC BY-SA 4.0.*
 
 The shortcut gives information and gradients a direct route through the network, making very deep CNNs easier to optimize.
 
 ---
 
 ## Canonical ResNet family
+
+![Canonical ResNet architectures](https://commons.wikimedia.org/wiki/Special:Redirect/file/ResNetTypes.png)
+
+*Source: [Wikimedia Commons — ResNetTypes](https://commons.wikimedia.org/wiki/File:ResNetTypes.png), CC BY-SA 4.0; based on the original ResNet paper.*
 
 The canonical torchvision models are:
 
@@ -43,18 +42,31 @@ The number in the model name is related to the conventional count of weighted la
 
 ## Common high-level architecture
 
-All canonical ResNets follow the same broad pattern:
+A standard ResNet follows this broad pattern:
 
-```mermaid
-flowchart LR
-    A[RGB image] --> B[Stem<br/>7×7 conv + BN + ReLU + max pool]
-    B --> C[layer1]
-    C --> D[layer2]
-    D --> E[layer3]
-    E --> F[layer4]
-    F --> G[Global average pool]
-    G --> H[Fully connected classifier]
+```text
+RGB image
+   ↓
+stem: 7×7 conv + BatchNorm + ReLU + max pool
+   ↓
+layer1
+   ↓
+layer2
+   ↓
+layer3
+   ↓
+layer4
+   ↓
+global average pooling
+   ↓
+fully connected classifier
 ```
+
+A full ResNet18 visualization is available here:
+
+![ResNet18 architecture](https://upload.wikimedia.org/wikipedia/commons/e/ee/Resnet-18_architecture_%28rotated%29.svg)
+
+*Source: [Wikimedia Commons — ResNet18 architecture](https://commons.wikimedia.org/wiki/File:Resnet-18_architecture_(rotated).svg), CC BY-SA 4.0.*
 
 What changes between ResNet18/34/50/101/152 is mainly:
 
@@ -64,22 +76,17 @@ What changes between ResNet18/34/50/101/152 is mainly:
 
 ---
 
-## BasicBlock — ResNet18 and ResNet34
+## BasicBlock versus Bottleneck
+
+The two canonical block designs can be compared directly:
+
+![Basic and Bottleneck residual blocks](https://upload.wikimedia.org/wikipedia/commons/8/86/ResBlockVariants.png)
+
+*Source: [Wikimedia Commons — ResBlockVariants](https://commons.wikimedia.org/wiki/File:ResBlockVariants.png), CC BY-SA 4.0.*
+
+### BasicBlock — ResNet18 and ResNet34
 
 A BasicBlock uses two `3×3` convolutions.
-
-```mermaid
-flowchart LR
-    X[Input] --> C1[3×3 Conv]
-    C1 --> B1[BatchNorm]
-    B1 --> R1[ReLU]
-    R1 --> C2[3×3 Conv]
-    C2 --> B2[BatchNorm]
-    X --> S[Shortcut]
-    B2 --> A[Add]
-    S --> A
-    A --> R2[ReLU]
-```
 
 For these models the stage output widths are approximately:
 
@@ -92,21 +99,14 @@ layer4 -> 512 channels
 
 ResNet18 uses fewer blocks than ResNet34, so it is lighter and faster.
 
----
+### Bottleneck block — ResNet50, ResNet101 and ResNet152
 
-## Bottleneck block — ResNet50, ResNet101 and ResNet152
+Deeper canonical ResNets use a three-convolution bottleneck block:
 
-Deeper ResNets use a three-convolution bottleneck block:
-
-```mermaid
-flowchart LR
-    X[Input] --> C1[1×1 Conv<br/>reduce / transform channels]
-    C1 --> C2[3×3 Conv<br/>spatial processing]
-    C2 --> C3[1×1 Conv<br/>expand channels]
-    X --> S[Shortcut]
-    C3 --> A[Add]
-    S --> A
-    A --> O[ReLU]
+```text
+1×1 conv -> reduce / transform channels
+3×3 conv -> spatial processing
+1×1 conv -> expand channels
 ```
 
 The `1×1 -> 3×3 -> 1×1` design lets the expensive spatial convolution operate in a narrower intermediate representation.
@@ -124,32 +124,38 @@ The main difference among 50, 101 and 152 is how many bottleneck blocks are repe
 
 ---
 
-## ResNet18 versus ResNet50
-
-This project has used both.
+## ResNet18 versus ResNet50 in this project
 
 ### ResNet18
 
 Used in M3 for image-level defect classification.
 
-```mermaid
-flowchart LR
-    A[Image] --> B[ResNet18 backbone]
-    B --> C[512-D pooled feature vector]
-    C --> D[Binary classifier]
-    D --> E[One defect logit]
+```text
+image
+  ↓
+ResNet18 backbone
+  ↓
+512-D pooled feature vector
+  ↓
+binary classifier
+  ↓
+one defect logit
 ```
 
 ### ResNet50
 
 Used as the backbone inside DeepLabV3 in M5.
 
-```mermaid
-flowchart LR
-    A[Image] --> B[ResNet50 backbone]
-    B --> C[2048-channel deep feature map]
-    C --> D[ASPP / DeepLabV3]
-    D --> E[Binary pixel logits]
+```text
+image
+  ↓
+ResNet50 backbone
+  ↓
+2048-channel deep feature map
+  ↓
+ASPP / DeepLabV3
+  ↓
+binary pixel logits
 ```
 
 ResNet50 is not simply “ResNet18 with more layers”. It also changes from BasicBlocks to Bottleneck blocks and its deepest feature representation is much wider.
@@ -249,6 +255,8 @@ If the backbone is fine-tuned, some or all of them become trainable.
 ---
 
 ## Project map
+
+This flow is project-specific, so a local diagram is still useful:
 
 ```mermaid
 flowchart LR
