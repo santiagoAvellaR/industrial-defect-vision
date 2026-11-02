@@ -10,6 +10,8 @@ The detailed notes explain each concept; this page answers at a glance:
 - what tensor it produces;
 - how it relates to the previous model.
 
+When a standard architecture already has a good public diagram, this atlas prefers that sourced figure over redrawing it in Mermaid. Mermaid is kept mainly for project-specific flows that do not have a canonical external figure.
+
 ## Architecture versus layer versus backbone
 
 A **layer** is one operation such as `Conv2d`, `BatchNorm2d`, `ReLU`, `MaxPool2d` or `Linear`.
@@ -41,7 +43,9 @@ Output:
 
 one logit per image.
 
-## Diagram
+## Project-specific diagram
+
+There is no canonical internet diagram for our custom baseline, so this one remains local to the project.
 
 ```mermaid
 flowchart LR
@@ -72,28 +76,22 @@ Implementation:
 
 Image-level classification using a pretrained visual backbone.
 
-```mermaid
-flowchart LR
-    A[Image] --> B[Stem<br/>Conv + BN + ReLU + Pool]
-    B --> C[layer1]
-    C --> D[layer2]
-    D --> E[layer3]
-    E --> F[layer4]
-    F --> G[Global average pooling]
-    G --> H[512-D vector]
-    H --> I[Binary classifier]
-    I --> J[Image logit]
-```
+![ResNet18 architecture](https://upload.wikimedia.org/wikipedia/commons/e/ee/Resnet-18_architecture_%28rotated%29.svg)
+
+*Source: [Wikimedia Commons — ResNet18 architecture](https://commons.wikimedia.org/wiki/File:Resnet-18_architecture_(rotated).svg), CC BY-SA 4.0, originally from Dive into Deep Learning.*
+
+The project replaces the original 1000-class ImageNet classifier with a binary classifier.
 
 ## Residual block
 
-```mermaid
-flowchart LR
-    X[Input x] --> F[Learned transformation F(x)]
-    X --> S[Shortcut]
-    F --> A[Add]
-    S --> A
-    A --> O[H(x)=F(x)+x]
+![Residual block](https://upload.wikimedia.org/wikipedia/commons/b/ba/ResBlock.png)
+
+*Source: [Wikimedia Commons — ResBlock](https://commons.wikimedia.org/wiki/File:ResBlock.png), CC BY-SA 4.0.*
+
+The defining operation is:
+
+```math
+H(x)=F(x)+x
 ```
 
 ResNet18 uses `BasicBlock` residual units and has about **11.69M parameters** in its standard ImageNet classifier form.
@@ -113,14 +111,9 @@ For the complete canonical family (`18/34/50/101/152`), block types, stage repea
 
 # 3. Canonical ResNet family
 
-```mermaid
-flowchart TD
-    R[Residual Networks] --> R18[ResNet18<br/>BasicBlock<br/>11.69M params]
-    R --> R34[ResNet34<br/>BasicBlock<br/>21.80M params]
-    R --> R50[ResNet50<br/>Bottleneck<br/>25.56M params]
-    R --> R101[ResNet101<br/>Bottleneck<br/>44.55M params]
-    R --> R152[ResNet152<br/>Bottleneck<br/>60.19M params]
-```
+![ResNet family comparison](https://commons.wikimedia.org/wiki/Special:Redirect/file/ResNetTypes.png)
+
+*Source: [Wikimedia Commons — ResNetTypes](https://commons.wikimedia.org/wiki/File:ResNetTypes.png), CC BY-SA 4.0; based on the original ResNet paper.*
 
 | Model | Block | Stage repeats | Standard classifier params |
 |---|---|---|---:|
@@ -148,27 +141,13 @@ Output:
 
 one defect logit per pixel.
 
-## Diagram
+## Reference U-Net architecture
 
-```mermaid
-flowchart TD
-    I[Image] --> E1[Encoder 16 ch]
-    E1 --> P1[Pool]
-    P1 --> E2[Encoder 32 ch]
-    E2 --> P2[Pool]
-    P2 --> E3[Encoder 64 ch]
-    E3 --> P3[Pool]
-    P3 --> B[Bottleneck 128 ch]
+![U-Net architecture](https://upload.wikimedia.org/wikipedia/commons/2/2b/Example_architecture_of_U-Net_for_producing_k_256-by-256_image_masks_for_a_256-by-256_RGB_image.png)
 
-    B --> D3[Upsample + decoder]
-    D3 --> D2[Upsample + decoder]
-    D2 --> D1[Upsample + decoder]
-    D1 --> O[1×1 Conv → pixel logits]
+*Source: [Wikimedia Commons — U-Net architecture example](https://commons.wikimedia.org/wiki/File:Example_architecture_of_U-Net_for_producing_k_256-by-256_image_masks_for_a_256-by-256_RGB_image.png), CC BY-SA 4.0.*
 
-    E3 -. skip .-> D3
-    E2 -. skip .-> D2
-    E1 -. skip .-> D1
-```
+Our `SimpleUNet` is intentionally smaller than the canonical U-Net, but it keeps the same structural idea: encoder, bottleneck, decoder and encoder-to-decoder skip connections.
 
 ## Structural idea
 
@@ -188,33 +167,39 @@ This is the M4 segmentation baseline used in EXP-010 through EXP-013.
 
 The same binary pixel-level task as SimpleUNet, but using a modern pretrained model family.
 
-```mermaid
-flowchart LR
-    A[RGB image] --> B[ImageNet normalization]
-    B --> C[ResNet50 backbone]
-    C --> D[Deep feature map]
-    D --> E[ASPP<br/>multi-scale atrous context]
-    E --> F[DeepLab classifier]
-    F --> G[1 defect logit / pixel]
-    G --> H[Upsample to input size]
+## DeepLabV3-ResNet50 reference architecture
+
+![DeepLabV3 ResNet50 architecture](https://raw.githubusercontent.com/ClarkArden/deeplabv3/master/deeplabv3_resnet50.png)
+
+*Source: [ClarkArden/deeplabv3](https://github.com/ClarkArden/deeplabv3), a PyTorch DeepLabV3 implementation based on torchvision.*
+
+Our wrapper uses the same high-level model family but adapts the final segmentation head to **one binary defect channel** and disables the auxiliary classifier.
+
+Exact project pipeline:
+
+```text
+RGB image
+   ↓
+ImageNet normalization
+   ↓
+ResNet50 backbone
+   ↓
+deep feature map
+   ↓
+ASPP / DeepLabV3 classifier
+   ↓
+1 defect logit per pixel
+   ↓
+upsample to input size
 ```
 
-## Internal mental model
+## ASPP visual reference
 
-```mermaid
-flowchart TD
-    F[ResNet50 deep features] --> A1[1×1 conv]
-    F --> A2[3×3 atrous conv r=12]
-    F --> A3[3×3 atrous conv r=24]
-    F --> A4[3×3 atrous conv r=36]
-    F --> A5[Global pooling branch]
-    A1 --> C[Concatenate + projection]
-    A2 --> C
-    A3 --> C
-    A4 --> C
-    A5 --> C
-    C --> O[Binary segmentation logits]
-```
+![ASPP module](https://www.mdpi.com/applsci/applsci-12-05151/article_deploy/html/images/applsci-12-05151-g003.png)
+
+*Source: [Applied Sciences 12(10), Figure 3](https://www.mdpi.com/2076-3417/12/10/5151), illustrating the standard ASPP parallel branches.*
+
+Torchvision's `DeepLabHead` uses the same ASPP idea with default dilation rates `(12, 24, 36)`.
 
 ## What is new compared with SimpleUNet?
 
@@ -247,6 +232,8 @@ Detailed notes:
 
 # Output contract across the project
 
+This is project-specific, so Mermaid is useful here.
+
 ```mermaid
 flowchart TD
     A[Image-level models] --> A1[BaselineCNN]
@@ -274,6 +261,8 @@ The model changes while the evaluation contract stays stable.
 ---
 
 # Progression of architectural ideas
+
+This progression is specific to this project, so it remains a local diagram.
 
 ```mermaid
 flowchart LR
