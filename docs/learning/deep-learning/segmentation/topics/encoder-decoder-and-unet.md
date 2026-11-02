@@ -25,6 +25,8 @@ flowchart TD
     D --> H[Upsampling / Conv / ReLU layers]
 ```
 
+This Mermaid diagram stays because it is a conceptual hierarchy created for these notes, not an attempt to reproduce the canonical U-Net architecture.
+
 ## The global problem
 
 Classification and segmentation ask different questions.
@@ -141,6 +143,8 @@ flowchart LR
     D --> E[High-resolution mask]
 ```
 
+This remains a conceptual flow rather than a canonical architecture drawing.
+
 At the bottleneck:
 
 - spatial resolution is usually the lowest;
@@ -225,6 +229,8 @@ flowchart LR
     E1 -. skip features .-> D1
 ```
 
+This remains because it isolates the skip-connection concept rather than trying to replace the standard U-Net figure.
+
 The normal path is:
 
 ```text
@@ -293,29 +299,13 @@ Its characteristic structure is:
 
 The classic shape resembles a `U`, which is the origin of the name U-Net.
 
-```mermaid
-flowchart TD
-    I[Input image] --> E1[Encoder stage 1]
-    E1 --> E2[Encoder stage 2]
-    E2 --> E3[Encoder stage 3]
-    E3 --> B[Bottleneck]
-    B --> D3[Decoder stage 3]
-    D3 --> D2[Decoder stage 2]
-    D2 --> D1[Decoder stage 1]
-    D1 --> O[Pixel logits / mask]
+### Reference architecture
 
-    E3 -. skip .-> D3
-    E2 -. skip .-> D2
-    E1 -. skip .-> D1
-```
+![U-Net architecture](https://upload.wikimedia.org/wikipedia/commons/2/2b/Example_architecture_of_U-Net_for_producing_k_256-by-256_image_masks_for_a_256-by-256_RGB_image.png)
 
-The left/downward path is the encoder.
+*Source: [Wikimedia Commons — U-Net architecture example](https://commons.wikimedia.org/wiki/File:Example_architecture_of_U-Net_for_producing_k_256-by-256_image_masks_for_a_256-by-256_RGB_image.png), CC BY-SA 4.0.*
 
-The bottom is the bottleneck.
-
-The right/upward path is the decoder.
-
-The horizontal shortcuts are the U-Net skips.
+The figure is a reference U-Net, not the exact tensor dimensions of our `SimpleUNet`. Our implementation is deliberately smaller, but the structural idea is the same: encoder path, bottleneck, decoder path and long encoder-to-decoder skip connections.
 
 ## Why U-Net is useful for KSDD2
 
