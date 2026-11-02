@@ -40,6 +40,14 @@ x . . x . . x
 
 The kernel still has only nine learned positions, but those positions cover a larger spatial region.
 
+## Visual reference
+
+![Dilated convolution animation](https://commons.wikimedia.org/wiki/Special:Redirect/file/Convolution_arithmetic_-_Dilation.gif)
+
+*Source: [Wikimedia Commons — Convolution arithmetic: Dilation](https://commons.wikimedia.org/wiki/File:Convolution_arithmetic_-_Dilation.gif). The animation makes the spacing between sampled input positions explicit.*
+
+A static comparison from the DeepLab literature also shows how increasing the atrous rate enlarges the sampled field of view without enlarging the learned `3×3` kernel itself.
+
 ---
 
 ## Effective kernel size
@@ -97,15 +105,22 @@ This is one reason they are important in DeepLab.
 
 ## Standard convolution versus dilated convolution
 
-```mermaid
-flowchart TD
-    A[Feature map] --> B1[Standard 3×3 conv]
-    A --> B2[Dilated 3×3 conv]
-    B1 --> C1[Local neighborhood]
-    B2 --> C2[Larger spatial context]
+Both produce learned feature maps. The difference is **where the kernel samples its input**.
+
+With the same `3×3` learned kernel:
+
+```text
+standard conv, dilation=1
+→ samples adjacent positions
+
+atrous conv, dilation>1
+→ samples positions with gaps
+→ wider effective field of view
 ```
 
-Both produce learned feature maps. The difference is where the convolution samples its input.
+The original DeepLabV3 paper uses exactly this idea to preserve denser feature maps while increasing context.
+
+Paper reference: [Rethinking Atrous Convolution for Semantic Image Segmentation](https://arxiv.org/abs/1706.05587).
 
 ---
 
