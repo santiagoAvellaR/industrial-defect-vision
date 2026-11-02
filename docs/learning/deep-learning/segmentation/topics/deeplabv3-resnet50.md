@@ -17,6 +17,14 @@ The comparison is useful because it separates two modeling strategies:
 - learn all visual features from scratch with a small U-Net;
 - reuse a pretrained ResNet50 representation and adapt DeepLabV3 to industrial defects.
 
+## Architecture reference
+
+![DeepLabV3 ResNet50 architecture](https://raw.githubusercontent.com/ClarkArden/deeplabv3/master/deeplabv3_resnet50.png)
+
+*Source: [ClarkArden/deeplabv3](https://github.com/ClarkArden/deeplabv3), a PyTorch DeepLabV3 implementation based on torchvision.*
+
+Our wrapper keeps the same model family but changes the final classifier to **one binary defect channel** and disables the auxiliary classifier.
+
 ## Mental model
 
 ```text
@@ -59,22 +67,19 @@ A dilated convolution inserts spacing between sampled kernel positions. This inc
 
 That matters in segmentation because the model needs both local detail and enough surrounding context to decide whether a small irregular region is a defect.
 
+Visual reference:
+
+![Dilated convolution](https://commons.wikimedia.org/wiki/Special:Redirect/file/Convolution_arithmetic_-_Dilation.gif)
+
+*Source: [Wikimedia Commons — Convolution arithmetic: Dilation](https://commons.wikimedia.org/wiki/File:Convolution_arithmetic_-_Dilation.gif).*
+
 ### ASPP
 
 ASPP means **Atrous Spatial Pyramid Pooling**. It processes the same feature map through parallel branches with different receptive fields, then combines them.
 
-Mental model:
+![ASPP module](https://www.mdpi.com/applsci/applsci-12-05151/article_deploy/html/images/applsci-12-05151-g003.png)
 
-```text
-features
-  ├─ local convolution
-  ├─ dilated convolution, smaller dilation
-  ├─ dilated convolution, medium dilation
-  ├─ dilated convolution, larger dilation
-  └─ global-context branch
-          ↓
-       combine
-```
+*Source: [Applied Sciences 12(10), Figure 3](https://www.mdpi.com/2076-3417/12/10/5151).*
 
 This gives DeepLabV3 explicit multi-scale context.
 
