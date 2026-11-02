@@ -1,6 +1,6 @@
 # Training — study index
 
-These notes cover the part of M2 that turns a forward pass and a scalar loss into learning.
+These notes cover the part of the project that turns a forward pass and a scalar loss into learning, then extends that understanding to reliable GPU execution.
 
 ## Suggested reading order
 
@@ -13,6 +13,8 @@ These notes cover the part of M2 that turns a forward pass and a scalar loss int
 7. [Class imbalance and positive weighting](topics/class-imbalance-and-pos-weight.md) — why EXP-001 collapsed to the majority class and how `pos_weight` changes BCE training.
 8. [Classification threshold](topics/classification-threshold.md) — how a probability becomes a class decision and why threshold choice trades precision against recall.
 9. [Error analysis](topics/error-analysis.md) — inspect FP/FN examples, score overlap and defect size before choosing the next model change.
+10. [GPU runtime, CUDA OOM, smoke tests and BatchNorm constraints](topics/gpu-runtime-smoke-tests-and-batchnorm.md) — GPU vs CUDA, VRAM, smoke tests, singleton BatchNorm failure and why EXP-014 uses `drop_last=True` for training.
+11. [Checkpoints and resumable training](topics/checkpoints-and-resuming.md) — best versus latest checkpoints, optimizer/RNG state and how to recover interrupted GPU experiments.
 
 ## Training boundary
 
@@ -36,35 +38,39 @@ The important separation is:
 - the optimizer uses gradients to update parameters;
 - gradients are cleared before the next standard training step so batches do not unintentionally accumulate into one another;
 - validation observes the model without updating it;
-- epoch metrics summarize behavior over all samples rather than one batch.
+- epoch metrics summarize behavior over all samples rather than one batch;
+- runtime checks such as smoke tests verify that the whole pipeline is operational before committing to expensive training;
+- best checkpoints support model selection, while latest checkpoints support interruption recovery.
 
-## Current M2 implementation
+## Current implementation
 
-Reusable train/validation epoch logic:
+Reusable classification train/validation logic:
 
 `src/industrial_vision/training/classification.py`
 
-Reusable validation-output collection:
+Reusable segmentation train/validation logic:
 
-`src/industrial_vision/evaluation/classification.py`
+`src/industrial_vision/training/segmentation.py`
 
-Executable baseline training script:
+Classification baseline training:
 
 `scripts/train_baseline.py`
 
-Threshold evaluation script:
+SimpleUNet segmentation training:
 
-`scripts/evaluate_thresholds.py`
+`scripts/train_simple_unet.py`
 
-Error-analysis script:
+DeepLabV3 segmentation training:
 
-`scripts/analyze_classification_errors.py`
+`scripts/train_deeplabv3.py`
 
-The training script reports loss, accuracy, precision, recall, F1 and TP/TN/FP/FN. By default it uses unweighted `BCEWithLogitsLoss()`; `--pos-weight` enables an explicitly weighted positive class for controlled imbalance experiments. The best checkpoint is selected by validation loss.
+The DeepLab script supports `--latest-checkpoint` and `--resume` so a remote GPU interruption does not require starting a long experiment from zero.
 
-The threshold script reuses a trained checkpoint and studies how the validation decision policy changes without retraining the CNN.
+Remote GPU workflow:
 
-The error-analysis script inspects validation predictions, score overlap, defect area, false negatives and false positives before another architecture change is chosen.
+`notebooks/colab/remote_training.ipynb`
+
+The Colab notebook stages KSDD2 onto ephemeral local storage, runs tests and smoke tests, executes training through the repository scripts and persists logs/checkpoints/figures to Google Drive.
 
 ## Interactive visual
 

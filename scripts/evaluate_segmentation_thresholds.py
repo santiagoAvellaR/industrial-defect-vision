@@ -56,7 +56,11 @@ def main() -> None:
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
-    dataset = KSDD2Dataset(args.dataset_root, args.val_manifest)
+    dataset = KSDD2Dataset(
+        args.dataset_root,
+        args.val_manifest,
+        imagenet_normalize=checkpoint.get("imagenet_normalize", False),
+    )
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
     thresholds = torch.linspace(0.10, 0.90, 17).tolist()

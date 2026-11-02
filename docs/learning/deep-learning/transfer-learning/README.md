@@ -1,12 +1,19 @@
 # Transfer learning
 
-This section records the concepts used in M3, where the scratch CNN baseline is compared with a pretrained visual backbone.
+This section records the concepts used from M3 onward, where scratch models are compared with pretrained visual representations and later reused for semantic segmentation.
 
 ## Reading order
 
 1. [Pretraining and freezing](topics/pretraining-and-freezing.md)
-2. [Fine-tuning](topics/fine-tuning.md)
-3. [ResNet18 and residual blocks](topics/resnet-and-residual-blocks.md)
+2. [Transfer learning versus fine-tuning](topics/transfer-learning-vs-fine-tuning.md)
+3. [Fine-tuning](topics/fine-tuning.md)
+4. [ImageNet normalization](topics/imagenet-normalization.md)
+5. [ResNet18 and residual blocks](topics/resnet-and-residual-blocks.md)
+
+For backbone terminology and the full ResNet family, see:
+
+- [`../architectures/topics/backbones.md`](../architectures/topics/backbones.md)
+- [`../architectures/topics/resnet-family.md`](../architectures/topics/resnet-family.md)
 
 ## Core mental model
 
@@ -18,28 +25,41 @@ Transfer learning starts from parameters learned on a previous visual task and r
 flowchart LR
     A[Large source dataset] --> B[Pretraining]
     B --> C[Pretrained visual features]
-    C --> D[Industrial defect dataset]
-    D --> E[Adapt classifier and/or backbone]
-    E --> F[Clean vs defective]
+    C --> D[Target industrial dataset]
+    D --> E1[Frozen feature extraction]
+    D --> E2[Fine-tuning]
 ```
 
 The source task and target task do not need to have the same labels. What is transferred is mainly the learned representation encoded in the network weights.
 
-## M3 questions
+The important distinction is:
 
-By the end of M3, we should be able to answer:
+```text
+transfer learning = broad strategy of reusing prior learned knowledge
+fine-tuning       = continue optimizing pretrained weights on the target data
+```
+
+Therefore a frozen pretrained backbone is already transfer learning even though it is not being fine-tuned.
+
+## M3/M5 questions
+
+We should be able to answer:
 
 - What does a pretrained model actually contain?
+- What is a backbone?
 - Which parameters are reused and which are newly initialized?
 - What does freezing a backbone change in backpropagation?
 - What is the difference between feature extraction and fine-tuning?
+- Can transfer learning happen without fine-tuning?
 - Why can transfer learning help when the target dataset is relatively small?
 - What is domain shift?
 - Why can a smaller learning rate be appropriate during fine-tuning?
 - How does a residual block differ from a plain stack of convolutions?
-- How should transfer learning be compared fairly against the scratch baseline?
+- Why must input preprocessing match the pretrained weight recipe?
+- What exactly does ImageNet normalization do?
+- How should transfer learning be compared fairly against a scratch baseline?
 
-## Controlled comparison completed
+## Controlled comparison completed in M3
 
 M3 compared three regimes on the same train/validation split and with the same classification metrics:
 
@@ -59,18 +79,31 @@ Partial fine-tuning changed that result substantially. At matched validation rec
 
 The best tested validation F1 of the fine-tuned model was `0.8090`.
 
-## Main M3 lesson
+## M5 extension
 
-The important result is not simply that a larger network performed better.
+EXP-014 moves the same idea to semantic segmentation:
 
-The sequence of experiments showed:
+```text
+pretrained DeepLabV3-ResNet50
+        ↓
+full model fine-tuning on KSDD2 masks
+        ↓
+binary defect segmentation
+```
+
+The model uses ImageNet-style input normalization because the pretrained weight recipe expects that numerical input convention.
+
+## Main lesson
+
+The important result is not simply that a larger network performs better.
+
+The sequence of experiments teaches that:
 
 - pretrained features can transfer useful visual information;
 - source-domain features may be poorly aligned with a specialized industrial domain;
 - freezing is a clean way to measure transferability before adaptation;
-- partial fine-tuning can adapt deeper representations while preserving earlier generic features;
-- fine-tuning also increases overfitting risk, so validation checkpoints remain essential.
+- fine-tuning can adapt the representation to the target domain;
+- fine-tuning increases overfitting risk, so validation checkpoints remain essential;
+- preprocessing is part of a pretrained model package and must stay consistent across training, validation and inference.
 
-In EXP-009, training approached perfect fit while validation loss worsened after the best checkpoint. This is why M3 stops at partial fine-tuning rather than automatically unfreezing more layers.
-
-The next milestone moves from image-level classification to semantic segmentation, using the defect masks to learn where defects are located.
+The project therefore treats transfer learning as an experimental strategy, not as an assumption that pretrained models must win.
