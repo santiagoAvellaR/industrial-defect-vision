@@ -8,23 +8,13 @@ It is one of the defining ideas of DeepLabV3.
 
 Instead of processing the deepest feature map at only one spatial scale, ASPP sends the same feature map through several parallel branches with different receptive fields and then combines them.
 
-Mental model:
+## Visual reference
 
-```mermaid
-flowchart LR
-    A[Deep feature map] --> B1[1×1 convolution]
-    A --> B2[3×3 atrous conv<br/>rate 12]
-    A --> B3[3×3 atrous conv<br/>rate 24]
-    A --> B4[3×3 atrous conv<br/>rate 36]
-    A --> B5[Global image pooling]
-    B1 --> C[Concatenate]
-    B2 --> C
-    B3 --> C
-    B4 --> C
-    B5 --> C
-    C --> D[Projection / fusion]
-    D --> E[Multiscale contextual features]
-```
+![ASPP module](https://www.mdpi.com/applsci/applsci-12-05151/article_deploy/html/images/applsci-12-05151-g003.png)
+
+*Source: [Applied Sciences 12(10), Figure 3](https://www.mdpi.com/2076-3417/12/10/5151). The figure illustrates the standard ASPP pattern: one `1×1` branch, several parallel atrous `3×3` branches, image pooling, then feature fusion.*
+
+The original DeepLabV3 paper describes the same structure with image-level features added to the ASPP module: [Rethinking Atrous Convolution for Semantic Image Segmentation](https://arxiv.org/abs/1706.05587).
 
 In torchvision's `DeepLabHead`, the default atrous rates are `(12, 24, 36)`.
 
@@ -74,6 +64,8 @@ It provides a relatively local representation and channel transformation.
 ### Atrous branches
 
 Several parallel `3×3` convolutions use different dilation rates.
+
+In torchvision DeepLabV3:
 
 ```text
 rate 12 -> one receptive scale
